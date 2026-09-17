@@ -109,6 +109,36 @@ const CALIFICACIONES = [
     articuloParcela: "7.14.2",
     articuloSotanos: "7.14.5.1",
   },
+  {
+    codigo: "IM",
+    nombre: "Industrial en Manzana",
+    parcela: { superficie: 200, frente: 8 },
+    ocupacion: 0.75,
+    sotanos: 1,
+    sotanoPerimetro: { limite: "parcela", articulo: "7.16.5.2" },
+    alturaFija: 8,
+    articuloAltura: "7.16.6",
+    edificabilidadFija: 1.0,
+    articuloEdificabilidad: "7.16.8",
+    articuloOcupacion: "7.16.4.1",
+    articuloParcela: "7.16.2.1",
+    articuloSotanos: "7.16.5.1",
+  },
+  {
+    codigo: "IA",
+    nombre: "Industrial Aislada",
+    parcela: { superficie: 1000, frente: 20 },
+    ocupacion: 0.5,
+    sotanos: 1,
+    sotanoPerimetro: { limite: "ocupacion", articulo: "7.17.5.2" },
+    alturaFija: 8,
+    articuloAltura: "7.17.6",
+    edificabilidadFija: 0.5,
+    articuloEdificabilidad: "7.17.8",
+    articuloOcupacion: "7.17.4.1",
+    articuloParcela: "7.17.2.1",
+    articuloSotanos: "7.17.5.1",
+  },
 ];
 
 const DOC = "PGOU Granada 2001, Título Séptimo (Continuación)";
@@ -130,25 +160,40 @@ function regla(id, article, conditions, severity, message, codigo, nombre) {
 
 function generar(c) {
   const rules = [];
-  const plantasAltura = Object.entries(c.alturas).map(([n, h]) => ({ n: Number(n), h }));
-  plantasAltura.forEach(({ n, h }, i) => {
-    const article = c.letrasAltura ? `${c.articuloAltura}.${c.letrasAltura[i]}` : c.articuloAltura;
+  if (c.alturaFija !== undefined) {
     rules.push(
       regla(
-        `GR-${c.codigo}-01${String.fromCharCode(65 + i)}`,
-        article,
+        `GR-${c.codigo}-01`,
+        c.articuloAltura,
         {
-          mode: "all",
-          items: [
-            { parameter: "edificio.numeroPlantas", operator: "==", value: n },
-            { parameter: "edificio.alturaMaxima", operator: ">", value: h },
-          ],
+          mode: "any",
+          items: [{ parameter: "edificio.alturaMaxima", operator: ">", value: c.alturaFija }],
         },
         "bloqueo",
-        `Edificio de ${n} planta${n > 1 ? "s" : ""} en calificación ${c.nombre}: la altura máxima es de ${h.toFixed(2).replace(".", ",")} m (art. ${article}).`
+        `En calificación ${c.nombre} la altura máxima de la edificación es de ${c.alturaFija.toFixed(2).replace(".", ",")} m (art. ${c.articuloAltura}).`
       )
     );
-  });
+  } else {
+    const plantasAltura = Object.entries(c.alturas).map(([n, h]) => ({ n: Number(n), h }));
+    plantasAltura.forEach(({ n, h }, i) => {
+      const article = c.letrasAltura ? `${c.articuloAltura}.${c.letrasAltura[i]}` : c.articuloAltura;
+      rules.push(
+        regla(
+          `GR-${c.codigo}-01${String.fromCharCode(65 + i)}`,
+          article,
+          {
+            mode: "all",
+            items: [
+              { parameter: "edificio.numeroPlantas", operator: "==", value: n },
+              { parameter: "edificio.alturaMaxima", operator: ">", value: h },
+            ],
+          },
+          "bloqueo",
+          `Edificio de ${n} planta${n > 1 ? "s" : ""} en calificación ${c.nombre}: la altura máxima es de ${h.toFixed(2).replace(".", ",")} m (art. ${article}).`
+        )
+      );
+    });
+  }
 
   rules.push(
     regla(
@@ -170,31 +215,53 @@ function generar(c) {
     )
   );
 
-  Object.entries(c.edificabilidades).forEach(([n, v], i) => {
-    const article = c.letrasEdificabilidad
-      ? `${c.articuloEdificabilidad}.${c.letrasEdificabilidad[i]}`
-      : c.articuloEdificabilidad;
+  if (c.edificabilidadFija !== undefined) {
     rules.push(
       regla(
-        `GR-${c.codigo}-04${String.fromCharCode(65 + i)}`,
-        article,
+        `GR-${c.codigo}-04`,
+        c.articuloEdificabilidad,
         {
           mode: "all",
           items: [
-            { parameter: "edificio.numeroPlantas", operator: "==", value: Number(n) },
             {
               numerator: "edificio.superficieEdificadaTotal",
               denominator: "parcela.superficie",
               operator: ">",
-              value: v,
+              value: c.edificabilidadFija,
             },
           ],
         },
         "bloqueo",
-        `Edificio de ${n} plantas en calificación ${c.nombre}: edificabilidad máxima ${String(v).replace(".", ",")} m²t/m²s (art. ${article}).`
+        `Edificabilidad máxima en calificación ${c.nombre}: ${String(c.edificabilidadFija).replace(".", ",")} m²t/m²s (art. ${c.articuloEdificabilidad}).`
       )
     );
-  });
+  } else {
+    Object.entries(c.edificabilidades).forEach(([n, v], i) => {
+      const article = c.letrasEdificabilidad
+        ? `${c.articuloEdificabilidad}.${c.letrasEdificabilidad[i]}`
+        : c.articuloEdificabilidad;
+      rules.push(
+        regla(
+          `GR-${c.codigo}-04${String.fromCharCode(65 + i)}`,
+          article,
+          {
+            mode: "all",
+            items: [
+              { parameter: "edificio.numeroPlantas", operator: "==", value: Number(n) },
+              {
+                numerator: "edificio.superficieEdificadaTotal",
+                denominator: "parcela.superficie",
+                operator: ">",
+                value: v,
+              },
+            ],
+          },
+          "bloqueo",
+          `Edificio de ${n} plantas en calificación ${c.nombre}: edificabilidad máxima ${String(v).replace(".", ",")} m²t/m²s (art. ${article}).`
+        )
+      );
+    });
+  }
 
   rules.push(
     regla(
@@ -291,8 +358,8 @@ const idsGenerados = new Set(generadas.map((r) => r.id));
 const pack = JSON.parse(readFileSync(PACK_PATH, "utf8"));
 const manuales = pack.rules.filter((r) => !idsGenerados.has(r.id));
 pack.rules = [...manuales, ...generadas];
-pack.version = "0.7.0";
-pack.scope = "Calificaciones RUMC, RUAL, RUAIS, RPMC, RPBA y Patio de Manzana + reglas generales del Título Séptimo";
+pack.version = "0.9.0";
+pack.scope = "Calificaciones RUMC, RUAL, RUAIS, RPMC, RPBA, Patio de Manzana, Industrial en Manzana y Industrial Aislada + reglas generales del Título Séptimo";
 pack.estado = "vigente";
 pack.noCubre = [
   "Normativa sectorial (CTE, REBT, RITE) — pack separado",

@@ -669,6 +669,45 @@ describe("constructor de modelos (geometría → parámetros derivados)", () => 
     expect(evaluateRule(rule, conforme)).toBeNull();
   });
 
+  it("industrial: altura fija de 8 m y edificabilidad fija por calificación (arts. 7.16.6 y 7.17.8)", () => {
+    const alturaIM: Rule = {
+      id: "GR-IM-01",
+      version: "0.1.0",
+      jurisdiction: "Granada",
+      source: { document: "PGOU 2001", article: "7.16.6" },
+      conditions: { mode: "any", items: [{ parameter: "edificio.alturaMaxima", operator: ">", value: 8 }] },
+      severity: "bloqueo",
+      message: "Altura máxima Industrial en Manzana: 8,00 m.",
+    };
+    const edifIA: Rule = {
+      id: "GR-IA-04",
+      version: "0.1.0",
+      jurisdiction: "Granada",
+      source: { document: "PGOU 2001", article: "7.17.8" },
+      conditions: {
+        mode: "all",
+        items: [
+          {
+            numerator: "edificio.superficieEdificadaTotal",
+            denominator: "parcela.superficie",
+            operator: ">",
+            value: 0.5,
+          },
+        ],
+      },
+      severity: "bloqueo",
+      message: "Edificabilidad máxima Industrial Aislada: 0,50 m²t/m²s.",
+    };
+    expect(evaluateRule(alturaIM, { edificio: { alturaMaxima: 8.5 } })).not.toBeNull();
+    expect(evaluateRule(alturaIM, { edificio: { alturaMaxima: 7.9 } })).toBeNull();
+    expect(
+      evaluateRule(edifIA, { edificio: { superficieEdificadaTotal: 600 }, parcela: { superficie: 1000 } })
+    ).not.toBeNull();
+    expect(
+      evaluateRule(edifIA, { edificio: { superficieEdificadaTotal: 450 }, parcela: { superficie: 1000 } })
+    ).toBeNull();
+  });
+
   it("el modelo derivado dispara las reglas RUAIS reales de retranqueo y edificabilidad", () => {
     const model = buildModel(kernel);
     const retranqueo: Rule = {
