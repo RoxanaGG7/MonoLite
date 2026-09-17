@@ -42,6 +42,27 @@ export function distanciaMinimaLinderos(
   return Number.isFinite(min) ? min : undefined;
 }
 
+export function distanciaSegmentoSegmento(a1: Punto, a2: Punto, b1: Punto, b2: Punto): number {
+  return Math.min(
+    distanciaPuntoSegmento(a1, b1, b2),
+    distanciaPuntoSegmento(a2, b1, b2),
+    distanciaPuntoSegmento(b1, a1, a2),
+    distanciaPuntoSegmento(b2, a1, a2)
+  );
+}
+
+export function distanciaEntrePoligonos(p1: Punto[], p2: Punto[]): number {
+  let min = Infinity;
+  for (let i = 0; i < p1.length; i++) {
+    const a1 = p1[i];
+    const a2 = p1[(i + 1) % p1.length];
+    for (let j = 0; j < p2.length; j++) {
+      min = Math.min(min, distanciaSegmentoSegmento(a1, a2, p2[j], p2[(j + 1) % p2.length]));
+    }
+  }
+  return min;
+}
+
 export function areaPoligono(poligono: Punto[]): number {
   let area = 0;
   for (let i = 0; i < poligono.length; i++) {

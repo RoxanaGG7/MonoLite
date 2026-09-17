@@ -6,6 +6,7 @@ const PACK_PATH = resolve(process.cwd(), "Docs-Internal", "packs", "urbanismo-gr
 const CALIFICACIONES = [
   {
     codigo: "RUMC",
+    sotanoPerimetro: { limite: "parcela", articulo: "7.9.5.2" },
     nombre: "Residencial Unifamiliar en Manzana Cerrada",
     parcela: { superficie: 80, frente: 5 },
     ocupacion: 0.8,
@@ -23,6 +24,7 @@ const CALIFICACIONES = [
   {
     codigo: "RUAL",
     frenteMaximo: { valor: 40, articulo: "7.10.7" },
+    sotanoPerimetro: { limite: "parcela", articulo: "7.10.5.2" },
     nombre: "Residencial Unifamiliar en Asociaciones Lineales",
     parcela: { superficie: 120, frente: 6 },
     ocupacion: 0.6,
@@ -39,6 +41,7 @@ const CALIFICACIONES = [
   },
   {
     codigo: "RUAIS",
+    sotanoPerimetro: { limite: "ocupacion", articulo: "7.11.5.2" },
     nombre: "Residencial Unifamiliar Aislada",
     parcela: { superficie: 250, frente: 10 },
     ocupacion: 0.3,
@@ -56,6 +59,7 @@ const CALIFICACIONES = [
   {
     codigo: "RPMC",
     frenteMaximo: { valor: 60, articulo: "7.12.10" },
+    sotanoPerimetro: { limite: "parcela", articulo: "7.12.5.2" },
     nombre: "Residencial Plurifamiliar en Manzana Cerrada",
     parcela: { superficie: 120, frente: 6 },
     ocupacion: 0.8,
@@ -73,6 +77,7 @@ const CALIFICACIONES = [
   {
     codigo: "RPBA",
     frenteMaximo: { valor: 60, articulo: "7.13.12" },
+    sotanoPerimetro: { limite: "ocupacion", articulo: "7.13.6.2" },
     nombre: "Residencial Plurifamiliar en Bloques Abiertos",
     parcela: { superficie: 500, frente: null },
     ocupacion: 0.5,
@@ -245,6 +250,34 @@ function generar(c) {
         },
         "bloqueo",
         `En calificación ${c.nombre} no se admiten frentes continuos de fachada de longitud superior a ${c.frenteMaximo.valor} m (art. ${c.frenteMaximo.articulo}).`
+      )
+    );
+  }
+
+  if (c.sotanoPerimetro) {
+    const denominador =
+      c.sotanoPerimetro.limite === "parcela" ? "parcela.superficie" : "edificio.superficieOcupadaProyectada";
+    const limiteTexto =
+      c.sotanoPerimetro.limite === "parcela"
+        ? "el 100% de la superficie de parcela"
+        : "la superficie de parcela ocupada por la edificación sobre rasante";
+    rules.push(
+      regla(
+        `GR-${c.codigo}-10`,
+        c.sotanoPerimetro.articulo,
+        {
+          mode: "all",
+          items: [
+            {
+              numerator: "edificio.superficieSotano",
+              denominator: denominador,
+              operator: ">",
+              value: 1,
+            },
+          ],
+        },
+        "bloqueo",
+        `El perímetro de la planta de sótano o semisótano no podrá exceder de ${limiteTexto} en calificación ${c.nombre} (art. ${c.sotanoPerimetro.articulo}).`
       )
     );
   }

@@ -8,6 +8,7 @@ import { deriveEdificio, derivePatio, type KernelModel, type Lindero, type Punto
 import { buildModel } from "../src/core/derive.js";
 import {
   areaPoligono,
+  distanciaEntrePoligonos,
   distanciaMinimaLinderos,
   distanciaPuntoSegmento,
 } from "../src/core/geometry.js";
@@ -600,6 +601,72 @@ describe("constructor de modelos (geometría → parámetros derivados)", () => 
   it("deriva la fachada máxima de la huella (frentes de manzana)", () => {
     const model = buildModel(kernel);
     expect((model.edificio as Record<string, number>).longitudMaximaFachada).toBe(15);
+  });
+
+  it("multi-volumen: par más crítico con distancia y separación requerida (art. 7.13.4)", () => {
+    const modelo = buildModel({
+      parcela: kernel.parcela,
+      edificio: kernel.edificio,
+      edificios: [
+        { ...kernel.edificio, alturaMaxima: 7.9, huella: [{ x: 0, y: 0 }, { x: 8, y: 0 }, { x: 8, y: 8 }, { x: 0, y: 8 }] },
+        { ...kernel.edificio, alturaMaxima: 21.1, huella: [{ x: 0, y: 20 }, { x: 8, y: 20 }, { x: 8, y: 28 }, { x: 0, y: 28 }] },
+      ],
+      entities: [],
+    });
+    const edificios = modelo.edificios as { distanciaMinimaEntreEdificios: number; separacionRequeridaEntreEdificios: number };
+    expect(edificios.distanciaMinimaEntreEdificios).toBe(12);
+    expect(edificios.separacionRequeridaEntreEdificios).toBe((7.9 + 21.1) / 2);
+    const rule: Rule = {
+      id: "GR-RPBA-10",
+      version: "0.1.0",
+      jurisdiction: "Granada",
+      source: { document: "PGOU 2001", article: "7.13.4" },
+      conditions: {
+        mode: "any",
+        items: [
+          {
+            parameter: "edificios.distanciaMinimaEntreEdificios",
+            operator: "<",
+            value: { param: "edificios.separacionRequeridaEntreEdificios" },
+          },
+        ],
+      },
+      severity: "bloqueo",
+      message: "Separación entre edificios enfrentados insuficiente.",
+    };
+    expect(evaluateRule(rule, modelo)).not.toBeNull();
+  });
+
+  it("distancia entre polígonos: separación exacta de 12 m entre huellas", () => {
+    const a = [{ x: 0, y: 0 }, { x: 8, y: 0 }, { x: 8, y: 8 }, { x: 0, y: 8 }];
+    const b = [{ x: 0, y: 20 }, { x: 8, y: 20 }, { x: 8, y: 28 }, { x: 0, y: 28 }];
+    expect(distanciaEntrePoligonos(a, b)).toBe(12);
+  });
+
+  it("perímetro de sótano RUAIS: no puede exceder la ocupación sobre rasante (art. 7.11.5.2)", () => {
+    const rule: Rule = {
+      id: "GR-RUAIS-10",
+      version: "0.1.0",
+      jurisdiction: "Granada",
+      source: { document: "PGOU 2001", article: "7.11.5.2" },
+      conditions: {
+        mode: "all",
+        items: [
+          {
+            numerator: "edificio.superficieSotano",
+            denominator: "edificio.superficieOcupadaProyectada",
+            operator: ">",
+            value: 1,
+          },
+        ],
+      },
+      severity: "bloqueo",
+      message: "Sótano: perímetro ≤ ocupación sobre rasante.",
+    };
+    const excesivo = { edificio: { superficieSotano: 200, superficieOcupadaProyectada: 150 } };
+    const conforme = { edificio: { superficieSotano: 140, superficieOcupadaProyectada: 150 } };
+    expect(evaluateRule(rule, excesivo)).not.toBeNull();
+    expect(evaluateRule(rule, conforme)).toBeNull();
   });
 
   it("el modelo derivado dispara las reglas RUAIS reales de retranqueo y edificabilidad", () => {

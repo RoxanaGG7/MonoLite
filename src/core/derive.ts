@@ -1,6 +1,6 @@
 import type { KernelModel } from "./kernel.js";
 import { deriveEdificio, derivePatio } from "./kernel.js";
-import { areaPoligono, distanciaMinimaLinderos } from "./geometry.js";
+import { areaPoligono, distanciaEntrePoligonos, distanciaMinimaLinderos } from "./geometry.js";
 
 export function buildModel(kernel: KernelModel): Record<string, unknown> {
   const parcela: Record<string, unknown> = { ...kernel.parcela };
@@ -36,5 +36,35 @@ export function buildModel(kernel: KernelModel): Record<string, unknown> {
   if (kernel.patio) model.patio = derivePatio(kernel.patio);
   if (kernel.patioVentilacion) model.patioVentilacion = derivePatio(kernel.patioVentilacion);
   if (kernel.espacio) model.espacio = { ...kernel.espacio };
+
+  if (kernel.edificio.huellaSotano && kernel.edificio.huellaSotano.length >= 3) {
+    edificio.superficieSotano = areaPoligono(kernel.edificio.huellaSotano);
+  }
+
+  if (kernel.edificios && kernel.edificios.length >= 2) {
+    const edificios = kernel.edificios;
+    let mejor: { distancia: number; requerida: number } | undefined;
+    for (let i = 0; i < edificios.length; i++) {
+      for (let j = i + 1; j < edificios.length; j++) {
+        const a = edificios[i];
+        const b = edificios[j];
+        const distancia = distanciaEntrePoligonos(a.huella, b.huella);
+        const requerida =
+          a.alturaMaxima === b.alturaMaxima
+            ? a.alturaMaxima
+            : (a.alturaMaxima + b.alturaMaxima) / 2;
+        if (!mejor || distancia - requerida < mejor.distancia - mejor.requerida) {
+          mejor = { distancia, requerida };
+        }
+      }
+    }
+    if (mejor) {
+      model.edificios = {
+        distanciaMinimaEntreEdificios: mejor.distancia,
+        separacionRequeridaEntreEdificios: mejor.requerida,
+      };
+    }
+  }
+
   return model;
 }

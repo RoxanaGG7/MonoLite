@@ -82,6 +82,7 @@ export interface Edificio {
   superficieCuartosServicio?: number;
   pendienteCubierta?: number;
   cubiertaSobreAlturaMaxima?: number;
+  huellaSotano?: Punto[];
 }
 
 export interface EdificioDerived extends Edificio {
@@ -117,6 +118,7 @@ export function derivePatio(patio: Patio): PatioDerived {
 export interface KernelModel {
   parcela: Parcela;
   edificio: Edificio;
+  edificios?: Edificio[];
   patio?: Patio;
   patioVentilacion?: Patio;
   espacio?: Espacio;
