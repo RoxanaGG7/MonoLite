@@ -80,6 +80,8 @@ export interface Edificio {
   superficieCuerposSalientesCubiertosCerrados?: number;
   superficieCuerposSalientesCubiertosAbiertos?: number;
   superficieCuartosServicio?: number;
+  pendienteCubierta?: number;
+  cubiertaSobreAlturaMaxima?: number;
 }
 
 export interface EdificioDerived extends Edificio {

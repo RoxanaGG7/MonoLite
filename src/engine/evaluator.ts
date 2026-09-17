@@ -36,7 +36,7 @@ export function checkCondition(condition: Condition, model: Record<string, unkno
   const threshold =
     typeof thresholdRaw === "number"
       ? thresholdRaw
-      : resolveParameter(thresholdRaw.param, model);
+      : (resolveParameter(thresholdRaw.param, model) ?? 0) * (thresholdRaw.factor ?? 1);
   if (threshold === undefined) return false;
   return OPERATORS[condition.operator](value, threshold);
 }

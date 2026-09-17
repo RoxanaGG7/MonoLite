@@ -22,6 +22,7 @@ const CALIFICACIONES = [
   },
   {
     codigo: "RUAL",
+    frenteMaximo: { valor: 40, articulo: "7.10.7" },
     nombre: "Residencial Unifamiliar en Asociaciones Lineales",
     parcela: { superficie: 120, frente: 6 },
     ocupacion: 0.6,
@@ -54,6 +55,7 @@ const CALIFICACIONES = [
   },
   {
     codigo: "RPMC",
+    frenteMaximo: { valor: 60, articulo: "7.12.10" },
     nombre: "Residencial Plurifamiliar en Manzana Cerrada",
     parcela: { superficie: 120, frente: 6 },
     ocupacion: 0.8,
@@ -70,6 +72,7 @@ const CALIFICACIONES = [
   },
   {
     codigo: "RPBA",
+    frenteMaximo: { valor: 60, articulo: "7.13.12" },
     nombre: "Residencial Plurifamiliar en Bloques Abiertos",
     parcela: { superficie: 500, frente: null },
     ocupacion: 0.5,
@@ -86,6 +89,7 @@ const CALIFICACIONES = [
   },
   {
     codigo: "PM",
+    frenteMaximo: { valor: 60, articulo: "7.14.10" },
     nombre: "Residencial Plurifamiliar en Patio de Manzana",
     parcela: { superficie: 500, frente: null },
     ocupacion: 0.5,
@@ -227,6 +231,23 @@ function generar(c) {
       `Máximo ${c.sotanos} planta${c.sotanos > 1 ? "s" : ""} de sótano o semisótano en calificación ${c.nombre} (art. ${c.articuloSotanos}).`
     )
   );
+
+  if (c.frenteMaximo) {
+    rules.push(
+      regla(
+        `GR-${c.codigo}-08`,
+        c.frenteMaximo.articulo,
+        {
+          mode: "any",
+          items: [
+            { parameter: "edificio.longitudMaximaFachada", operator: ">", value: c.frenteMaximo.valor },
+          ],
+        },
+        "bloqueo",
+        `En calificación ${c.nombre} no se admiten frentes continuos de fachada de longitud superior a ${c.frenteMaximo.valor} m (art. ${c.frenteMaximo.articulo}).`
+      )
+    );
+  }
 
   return rules;
 }

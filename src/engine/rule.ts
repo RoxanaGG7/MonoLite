@@ -2,7 +2,7 @@ export type Severity = "bloqueo" | "ambar" | "aviso";
 
 export type Operator = "<" | "<=" | ">" | ">=" | "==" | "!=";
 
-export type ConditionValue = number | { param: string };
+export type ConditionValue = number | { param: string; factor?: number };
 
 export interface SimpleCondition {
   parameter: string;

@@ -162,6 +162,53 @@ describe("motor de reglas (L0 — determinista)", () => {
     };
     expect(evaluateRule(rule, { a: { x: 1 }, b: { y: 0 } })).toBeNull();
   });
+
+  it("umbral paramétrico con factor: separación RPBA ≥ altura/2 (art. 7.13.3)", () => {
+    const rule: Rule = {
+      id: "GR-RPBA-09",
+      version: "0.1.0",
+      jurisdiction: "Granada",
+      source: { document: "PGOU 2001", article: "7.13.3" },
+      conditions: {
+        mode: "any",
+        items: [
+          {
+            parameter: "edificio.distanciaMinimaLinderos",
+            operator: "<",
+            value: { param: "edificio.alturaMaxima", factor: 0.5 },
+          },
+          { parameter: "edificio.distanciaMinimaLinderos", operator: "<=", value: 3 },
+        ],
+      },
+      severity: "bloqueo",
+      message: "Separación RPBA: ≥ altura/2 y >3 m.",
+    };
+    const alto = { edificio: { distanciaMinimaLinderos: 4, alturaMaxima: 21.1 } };
+    const bajo = { edificio: { distanciaMinimaLinderos: 4, alturaMaxima: 7.9 } };
+    expect(evaluateRule(rule, alto)).not.toBeNull();
+    expect(evaluateRule(rule, bajo)).toBeNull();
+    expect(evaluateRule(rule, { edificio: { distanciaMinimaLinderos: 2.9, alturaMaxima: 4.6 } })).not.toBeNull();
+  });
+
+  it("cubierta sobre altura máxima con pendiente ≥ 40% está prohibida (art. 7.3.17)", () => {
+    const rule: Rule = {
+      id: "GR-URB-06E",
+      version: "0.1.0",
+      jurisdiction: "Granada",
+      source: { document: "PGOU 2001", article: "7.3.17" },
+      conditions: {
+        mode: "all",
+        items: [
+          { parameter: "edificio.cubiertaSobreAlturaMaxima", operator: "==", value: 1 },
+          { parameter: "edificio.pendienteCubierta", operator: ">=", value: 40 },
+        ],
+      },
+      severity: "bloqueo",
+      message: "Cubierta sobre altura máx. solo con pendiente <40%.",
+    };
+    expect(evaluateRule(rule, { edificio: { cubiertaSobreAlturaMaxima: 1, pendienteCubierta: 55 } })).not.toBeNull();
+    expect(evaluateRule(rule, { edificio: { cubiertaSobreAlturaMaxima: 1, pendienteCubierta: 30 } })).toBeNull();
+  });
 });
 
 describe("geometría del núcleo (distancias a linderos)", () => {
@@ -548,6 +595,11 @@ describe("constructor de modelos (geometría → parámetros derivados)", () => 
   it("deriva la longitud del lindero frontal desde la geometría", () => {
     const model = buildModel(kernel);
     expect((model.parcela as { longitudLinderoFrontal: number }).longitudLinderoFrontal).toBe(20);
+  });
+
+  it("deriva la fachada máxima de la huella (frentes de manzana)", () => {
+    const model = buildModel(kernel);
+    expect((model.edificio as Record<string, number>).longitudMaximaFachada).toBe(15);
   });
 
   it("el modelo derivado dispara las reglas RUAIS reales de retranqueo y edificabilidad", () => {

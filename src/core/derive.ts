@@ -19,6 +19,13 @@ export function buildModel(kernel: KernelModel): Record<string, unknown> {
     edificio.superficieOcupadaProyectada = areaPoligono(kernel.edificio.huella);
     const distancia = distanciaMinimaLinderos(kernel.edificio.huella, kernel.parcela.linderos);
     if (distancia !== undefined) edificio.distanciaMinimaLinderos = distancia;
+    let fachadaMax = 0;
+    for (let i = 0; i < kernel.edificio.huella.length; i++) {
+      const p1 = kernel.edificio.huella[i];
+      const p2 = kernel.edificio.huella[(i + 1) % kernel.edificio.huella.length];
+      fachadaMax = Math.max(fachadaMax, Math.hypot(p2.x - p1.x, p2.y - p1.y));
+    }
+    edificio.longitudMaximaFachada = fachadaMax;
   }
 
   const model: Record<string, unknown> = {
