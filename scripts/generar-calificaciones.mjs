@@ -103,13 +103,15 @@ const CALIFICACIONES = [
 ];
 
 const DOC = "PGOU Granada 2001, Título Séptimo (Continuación)";
+const FECHA_CONSULTA = "2026-09-17";
+const FUENTE_URL = "https://www.granada.org/inet/wpgo.nsf/xtod/8E5351BBD612227AC1256E27007BB09D?open";
 
 function regla(id, article, conditions, severity, message, codigo, nombre) {
   return {
     id,
     version: "0.1.0",
     jurisdiction: "Granada (PGOU 2001)",
-    source: { document: DOC, article },
+    source: { document: DOC, article, fechaConsulta: FECHA_CONSULTA, fuenteUrl: FUENTE_URL },
     scope: { calificacion: codigo },
     conditions,
     severity,
@@ -235,8 +237,23 @@ const idsGenerados = new Set(generadas.map((r) => r.id));
 const pack = JSON.parse(readFileSync(PACK_PATH, "utf8"));
 const manuales = pack.rules.filter((r) => !idsGenerados.has(r.id));
 pack.rules = [...manuales, ...generadas];
-pack.version = "0.5.0";
+pack.version = "0.7.0";
 pack.scope = "Calificaciones RUMC, RUAL, RUAIS, RPMC, RPBA y Patio de Manzana + reglas generales del Título Séptimo";
+pack.estado = "vigente";
+pack.noCubre = [
+  "Normativa sectorial (CTE, REBT, RITE) — pack separado",
+  "Catálogos de protección y planes especiales (Alhambra, Albaicín, San Matías)",
+  "Condiciones no mecanizadas: separaciones entre edificios de RPBA, frentes máximos de manzana",
+  "Normativa de usos (Título Sexto) — en revisión por modificación BOP 230/2024"
+];
+const articulosMapeados = [...new Set(pack.rules.map((r) => r.source.article))].sort();
+pack.cobertura = {
+  fuente: "PGOU Granada 2001, Normativa completa del Título Séptimo y ordenanzas por calificación",
+  fuenteUrl: FUENTE_URL,
+  fechaConsulta: FECHA_CONSULTA,
+  articulosMapeados
+};
 
 writeFileSync(PACK_PATH, JSON.stringify(pack, null, 2) + "\n", "utf8");
 console.log(`Pack generado: ${pack.rules.length} reglas (${manuales.length} manuales + ${generadas.length} generadas de ${CALIFICACIONES.length} calificaciones)`);
+console.log(`Cobertura: ${articulosMapeados.length} artículos mapeados | estado: ${pack.estado} | noCubre: ${pack.noCubre.length} exclusiones declaradas`);

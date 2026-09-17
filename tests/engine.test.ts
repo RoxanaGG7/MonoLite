@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import { evaluatePack, evaluateRule } from "../src/engine/evaluator.js";
 import type { Rule, ComputationRule } from "../src/engine/rule.js";
 import { applyComputations } from "../src/engine/computation.js";
+import { generarInforme } from "../src/engine/informe.js";
 import { loadPack } from "../src/engine/loader.js";
 import { deriveEdificio, derivePatio, type KernelModel, type Lindero, type Punto } from "../src/core/kernel.js";
 import { buildModel } from "../src/core/derive.js";
@@ -12,6 +13,7 @@ import {
 } from "../src/core/geometry.js";
 import { getCapabilities } from "../src/ai/capabilities.js";
 import { resolve } from "node:path";
+import { existsSync } from "node:fs";
 
 const patioRule: Rule = {
   id: "TEST-URB-05",
@@ -454,6 +456,49 @@ describe("regla de cómputo (art. 7.3.13): el takeoff nace normado", () => {
     const model = applyComputations([computo], { edificio: { superficieEdificadaTotal: 300 } });
     expect((model.edificio as Record<string, number>).superficieEdificadaTotal).toBe(300);
   });
+});
+
+describe("informe con declaración de cobertura (anti-obsolescencia)", () => {
+  const rule: Rule = {
+    id: "TEST-01",
+    version: "0.1.0",
+    jurisdiction: "test",
+    source: { document: "Norma A", article: "1.1" },
+    conditions: { mode: "any", items: [{ parameter: "a.b", operator: ">", value: 1 }] },
+    severity: "bloqueo",
+    message: "test",
+  };
+
+  it("informe verde declara qué evalúa y qué no", () => {
+    const informe = generarInforme([rule], [], {
+      noCubre: ["Normativa sectorial", "Catálogos de protección"],
+    });
+    expect(informe.estado).toBe("verde");
+    expect(informe.cobertura.evalua).toEqual(["Norma A"]);
+    expect(informe.cobertura.articulos).toEqual(["1.1"]);
+    expect(informe.cobertura.noCubre).toHaveLength(2);
+  });
+
+  it("estado rojo con bloqueo, ámbar con solo avisos", () => {
+    const violation = evaluateRule(rule, { a: { b: 2 } })!;
+    const ambarRule: Rule = { ...rule, id: "TEST-02", severity: "ambar" };
+    const ambarViolation = evaluateRule(ambarRule, { a: { b: 2 } })!;
+    expect(generarInforme([rule], [violation]).estado).toBe("rojo");
+    expect(generarInforme([ambarRule], [ambarViolation]).estado).toBe("ambar");
+    expect(generarInforme([rule], []).estado).toBe("verde");
+  });
+
+  it.skipIf(!existsSync(resolve("Docs-Internal", "packs", "urbanismo-granada", "granada.json")))(
+    "el pack real de Granada declara 57 artículos y 4 exclusiones",
+    () => {
+      const pack = loadPack(resolve("Docs-Internal", "packs", "urbanismo-granada", "granada.json"));
+      expect(pack.cobertura?.articulosMapeados.length).toBeGreaterThan(50);
+      expect(pack.noCubre?.length).toBe(4);
+      expect(pack.estado).toBe("vigente");
+      const informe = generarInforme(pack.rules, [], pack);
+      expect(informe.cobertura.articulos.length).toBeGreaterThan(50);
+    }
+  );
 });
 
 describe("constructor de modelos (geometría → parámetros derivados)", () => {

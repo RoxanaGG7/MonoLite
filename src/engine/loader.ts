@@ -1,7 +1,7 @@
 import { readFileSync } from "node:fs";
-import type { ComputationRule, Rule } from "./rule.js";
+import type { ComputationRule, PackMetadata, Rule } from "./rule.js";
 
-export interface Pack {
+export interface Pack extends PackMetadata {
   jurisdiction: string;
   version: string;
   vigencia?: string;

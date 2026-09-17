@@ -28,6 +28,21 @@ export interface RuleSource {
   document: string;
   article: string;
   vigencia?: string;
+  fechaConsulta?: string;
+  fuenteUrl?: string;
+}
+
+export interface Cobertura {
+  fuente: string;
+  fuenteUrl?: string;
+  fechaConsulta: string;
+  articulosMapeados: string[];
+}
+
+export interface PackMetadata {
+  estado?: "vigente" | "en_revision" | "derogado";
+  noCubre?: string[];
+  cobertura?: Cobertura;
 }
 
 export interface ComputationTerm {
