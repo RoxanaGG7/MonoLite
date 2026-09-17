@@ -1,19 +1,32 @@
 {
   "jurisdiction": "Granada (PGOU 2001)",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "vigencia": "PGOU 2001 con adaptaciones posteriores (verificar BOP)",
   "rules": [
     {
       "id": "GR-RUAIS-01A",
       "version": "0.1.0",
       "jurisdiction": "Granada (PGOU 2001)",
-      "source": { "document": "PGOU Granada 2001, Título Séptimo (Continuación)", "article": "7.11.6.2.a" },
-      "scope": { "calificacion": "RUAIS" },
+      "source": {
+        "document": "PGOU Granada 2001, Título Séptimo (Continuación)",
+        "article": "7.11.6.2.a"
+      },
+      "scope": {
+        "calificacion": "RUAIS"
+      },
       "conditions": {
         "mode": "all",
         "items": [
-          { "parameter": "edificio.numeroPlantas", "operator": "==", "value": 1 },
-          { "parameter": "edificio.alturaMaxima", "operator": ">", "value": 4.6 }
+          {
+            "parameter": "edificio.numeroPlantas",
+            "operator": "==",
+            "value": 1
+          },
+          {
+            "parameter": "edificio.alturaMaxima",
+            "operator": ">",
+            "value": 4.6
+          }
         ]
       },
       "severity": "bloqueo",
@@ -23,13 +36,26 @@
       "id": "GR-RUAIS-01B",
       "version": "0.1.0",
       "jurisdiction": "Granada (PGOU 2001)",
-      "source": { "document": "PGOU Granada 2001, Título Séptimo (Continuación)", "article": "7.11.6.2.b" },
-      "scope": { "calificacion": "RUAIS" },
+      "source": {
+        "document": "PGOU Granada 2001, Título Séptimo (Continuación)",
+        "article": "7.11.6.2.b"
+      },
+      "scope": {
+        "calificacion": "RUAIS"
+      },
       "conditions": {
         "mode": "all",
         "items": [
-          { "parameter": "edificio.numeroPlantas", "operator": "==", "value": 2 },
-          { "parameter": "edificio.alturaMaxima", "operator": ">", "value": 7.9 }
+          {
+            "parameter": "edificio.numeroPlantas",
+            "operator": "==",
+            "value": 2
+          },
+          {
+            "parameter": "edificio.alturaMaxima",
+            "operator": ">",
+            "value": 7.9
+          }
         ]
       },
       "severity": "bloqueo",
@@ -39,13 +65,26 @@
       "id": "GR-RUAIS-01C",
       "version": "0.1.0",
       "jurisdiction": "Granada (PGOU 2001)",
-      "source": { "document": "PGOU Granada 2001, Título Séptimo (Continuación)", "article": "7.11.6.2.c" },
-      "scope": { "calificacion": "RUAIS" },
+      "source": {
+        "document": "PGOU Granada 2001, Título Séptimo (Continuación)",
+        "article": "7.11.6.2.c"
+      },
+      "scope": {
+        "calificacion": "RUAIS"
+      },
       "conditions": {
         "mode": "all",
         "items": [
-          { "parameter": "edificio.numeroPlantas", "operator": "==", "value": 3 },
-          { "parameter": "edificio.alturaMaxima", "operator": ">", "value": 11.2 }
+          {
+            "parameter": "edificio.numeroPlantas",
+            "operator": "==",
+            "value": 3
+          },
+          {
+            "parameter": "edificio.alturaMaxima",
+            "operator": ">",
+            "value": 11.2
+          }
         ]
       },
       "severity": "bloqueo",
@@ -55,12 +94,21 @@
       "id": "GR-RUAIS-02",
       "version": "0.1.0",
       "jurisdiction": "Granada (PGOU 2001)",
-      "source": { "document": "PGOU Granada 2001, Título Séptimo (Continuación)", "article": "7.11.3" },
-      "scope": { "calificacion": "RUAIS" },
+      "source": {
+        "document": "PGOU Granada 2001, Título Séptimo (Continuación)",
+        "article": "7.11.3"
+      },
+      "scope": {
+        "calificacion": "RUAIS"
+      },
       "conditions": {
         "mode": "any",
         "items": [
-          { "parameter": "edificio.distanciaMinimaLinderos", "operator": "<", "value": 3 }
+          {
+            "parameter": "edificio.distanciaMinimaLinderos",
+            "operator": "<",
+            "value": 3
+          }
         ]
       },
       "severity": "bloqueo",
@@ -70,8 +118,13 @@
       "id": "GR-RUAIS-03",
       "version": "0.1.0",
       "jurisdiction": "Granada (PGOU 2001)",
-      "source": { "document": "PGOU Granada 2001, Título Séptimo (Continuación)", "article": "7.11.4.1" },
-      "scope": { "calificacion": "RUAIS" },
+      "source": {
+        "document": "PGOU Granada 2001, Título Séptimo (Continuación)",
+        "article": "7.11.4.1"
+      },
+      "scope": {
+        "calificacion": "RUAIS"
+      },
       "conditions": {
         "mode": "all",
         "items": [
@@ -90,12 +143,21 @@
       "id": "GR-RUAIS-04B",
       "version": "0.1.0",
       "jurisdiction": "Granada (PGOU 2001)",
-      "source": { "document": "PGOU Granada 2001, Título Séptimo (Continuación)", "article": "7.11.8.1.b" },
-      "scope": { "calificacion": "RUAIS" },
+      "source": {
+        "document": "PGOU Granada 2001, Título Séptimo (Continuación)",
+        "article": "7.11.8.1.b"
+      },
+      "scope": {
+        "calificacion": "RUAIS"
+      },
       "conditions": {
         "mode": "all",
         "items": [
-          { "parameter": "edificio.numeroPlantas", "operator": "==", "value": 2 },
+          {
+            "parameter": "edificio.numeroPlantas",
+            "operator": "==",
+            "value": 2
+          },
           {
             "numerator": "edificio.superficieEdificadaTotal",
             "denominator": "parcela.superficie",
@@ -118,17 +180,133 @@
       "conditions": {
         "mode": "any",
         "items": [
-          { "parameter": "patio.anchoMinimo", "operator": "<", "value": 3 },
           {
             "parameter": "patio.anchoMinimo",
             "operator": "<",
-            "value": { "param": "patio.diametroMinimoRequerido" }
+            "value": 3
           },
-          { "parameter": "patio.superficieUtil", "operator": "<", "value": 9 }
+          {
+            "parameter": "patio.anchoMinimo",
+            "operator": "<",
+            "value": {
+              "param": "patio.diametroMinimoRequerido"
+            }
+          },
+          {
+            "parameter": "patio.superficieUtil",
+            "operator": "<",
+            "value": 9
+          }
         ]
       },
       "severity": "bloqueo",
       "message": "El patio de luces no cumple las dimensiones mínimas del art. 7.3.23.2: lado ≥ 3,00 m, círculo de diámetro máx(3 m, H/3), superficie ≥ 9 m². La anchura mínima debe mantenerse en toda la altura (art. 7.3.22.3)."
+    },
+    {
+      "id": "GR-RPMC-01B",
+      "version": "0.1.0",
+      "jurisdiction": "Granada (PGOU 2001)",
+      "source": {
+        "document": "PGOU Granada 2001, Título Séptimo (Continuación)",
+        "article": "7.12.6"
+      },
+      "scope": {
+        "calificacion": "RPMC"
+      },
+      "conditions": {
+        "mode": "all",
+        "items": [
+          {
+            "parameter": "edificio.numeroPlantas",
+            "operator": "==",
+            "value": 2
+          },
+          {
+            "parameter": "edificio.alturaMaxima",
+            "operator": ">",
+            "value": 7.9
+          }
+        ]
+      },
+      "severity": "bloqueo",
+      "message": "Edificio de 2 plantas en calificación RPMC: altura máxima 7,90 m (art. 7.12.6)."
+    },
+    {
+      "id": "GR-RPMC-03",
+      "version": "0.1.0",
+      "jurisdiction": "Granada (PGOU 2001)",
+      "source": {
+        "document": "PGOU Granada 2001, Título Séptimo (Continuación)",
+        "article": "7.12.4.1"
+      },
+      "scope": {
+        "calificacion": "RPMC"
+      },
+      "conditions": {
+        "mode": "all",
+        "items": [
+          {
+            "numerator": "edificio.superficieOcupadaProyectada",
+            "denominator": "parcela.superficie",
+            "operator": ">",
+            "value": 0.8
+          }
+        ]
+      },
+      "severity": "bloqueo",
+      "message": "La ocupación máxima en calificación RPMC es del 80% de la parcela por planta (art. 7.12.4.1)."
+    },
+    {
+      "id": "GR-RPMC-04B",
+      "version": "0.1.0",
+      "jurisdiction": "Granada (PGOU 2001)",
+      "source": {
+        "document": "PGOU Granada 2001, Título Séptimo (Continuación)",
+        "article": "7.12.8"
+      },
+      "scope": {
+        "calificacion": "RPMC"
+      },
+      "conditions": {
+        "mode": "all",
+        "items": [
+          {
+            "parameter": "edificio.numeroPlantas",
+            "operator": "==",
+            "value": 2
+          },
+          {
+            "numerator": "edificio.superficieEdificadaTotal",
+            "denominator": "parcela.superficie",
+            "operator": ">",
+            "value": 1.6
+          }
+        ]
+      },
+      "severity": "bloqueo",
+      "message": "Edificio de 2 plantas en RPMC: edificabilidad máxima 1,60 m²t/m²s (art. 7.12.8)."
     }
-  ]
+  ],
+  "noCubre": [
+    "Normativa sectorial (CTE, REBT, RITE) — pack separado",
+    "Catálogos de protección y planes especiales",
+    "Condiciones de la calificación no cargadas en esta demo"
+  ],
+  "estado": "vigente",
+  "cobertura": {
+    "fuente": "PGOU Granada 2001, Título Séptimo",
+    "fechaConsulta": "2026-09-17",
+    "articulosMapeados": [
+      "7.11.6.2.a",
+      "7.11.6.2.b",
+      "7.11.6.2.c",
+      "7.11.3",
+      "7.11.4.1",
+      "7.11.8.1.b",
+      "7.3.23.2 (patios de luces)",
+      "7.12.6",
+      "7.12.4.1",
+      "7.12.8"
+    ]
+  }
 }

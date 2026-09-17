@@ -48,6 +48,25 @@
     }
     return Number.isFinite(min) ? min : void 0;
   }
+  function distanciaSegmentoSegmento(a1, a2, b1, b2) {
+    return Math.min(
+      distanciaPuntoSegmento(a1, b1, b2),
+      distanciaPuntoSegmento(a2, b1, b2),
+      distanciaPuntoSegmento(b1, a1, a2),
+      distanciaPuntoSegmento(b2, a1, a2)
+    );
+  }
+  function distanciaEntrePoligonos(p1, p2) {
+    let min = Infinity;
+    for (let i = 0; i < p1.length; i++) {
+      const a1 = p1[i];
+      const a2 = p1[(i + 1) % p1.length];
+      for (let j = 0; j < p2.length; j++) {
+        min = Math.min(min, distanciaSegmentoSegmento(a1, a2, p2[j], p2[(j + 1) % p2.length]));
+      }
+    }
+    return min;
+  }
   function areaPoligono(poligono) {
     let area = 0;
     for (let i = 0; i < poligono.length; i++) {
@@ -64,11 +83,24 @@
     if (kernel.parcela.contorno && kernel.parcela.contorno.length >= 3) {
       parcela.superficie = areaPoligono(kernel.parcela.contorno);
     }
+    const frontales = kernel.parcela.linderos.filter((l) => l.tipo === "frontal");
+    if (frontales.length > 0) {
+      parcela.longitudLinderoFrontal = Math.max(
+        ...frontales.map((l) => Math.hypot(l.b.x - l.a.x, l.b.y - l.a.y))
+      );
+    }
     const edificio = { ...deriveEdificio(kernel.edificio) };
     if (kernel.edificio.huella.length >= 3) {
       edificio.superficieOcupadaProyectada = areaPoligono(kernel.edificio.huella);
       const distancia = distanciaMinimaLinderos(kernel.edificio.huella, kernel.parcela.linderos);
       if (distancia !== void 0) edificio.distanciaMinimaLinderos = distancia;
+      let fachadaMax = 0;
+      for (let i = 0; i < kernel.edificio.huella.length; i++) {
+        const p1 = kernel.edificio.huella[i];
+        const p2 = kernel.edificio.huella[(i + 1) % kernel.edificio.huella.length];
+        fachadaMax = Math.max(fachadaMax, Math.hypot(p2.x - p1.x, p2.y - p1.y));
+      }
+      edificio.longitudMaximaFachada = fachadaMax;
     }
     const model = {
       parcela,
@@ -77,7 +109,32 @@
     };
     if (kernel.patio) model.patio = derivePatio(kernel.patio);
     if (kernel.patioVentilacion) model.patioVentilacion = derivePatio(kernel.patioVentilacion);
+    if (kernel.patioManzana) model.patioManzana = { ...kernel.patioManzana };
     if (kernel.espacio) model.espacio = { ...kernel.espacio };
+    if (kernel.edificio.huellaSotano && kernel.edificio.huellaSotano.length >= 3) {
+      edificio.superficieSotano = areaPoligono(kernel.edificio.huellaSotano);
+    }
+    if (kernel.edificios && kernel.edificios.length >= 2) {
+      const edificios = kernel.edificios;
+      let mejor;
+      for (let i = 0; i < edificios.length; i++) {
+        for (let j = i + 1; j < edificios.length; j++) {
+          const a = edificios[i];
+          const b = edificios[j];
+          const distancia = distanciaEntrePoligonos(a.huella, b.huella);
+          const requerida = a.alturaMaxima === b.alturaMaxima ? a.alturaMaxima : (a.alturaMaxima + b.alturaMaxima) / 2;
+          if (!mejor || distancia - requerida < mejor.distancia - mejor.requerida) {
+            mejor = { distancia, requerida };
+          }
+        }
+      }
+      if (mejor) {
+        model.edificios = {
+          distanciaMinimaEntreEdificios: mejor.distancia,
+          separacionRequeridaEntreEdificios: mejor.requerida
+        };
+      }
+    }
     return model;
   }
 
@@ -112,7 +169,7 @@
     const value = resolveParameter(condition.parameter, model);
     if (value === void 0) return false;
     const thresholdRaw = condition.value;
-    const threshold = typeof thresholdRaw === "number" ? thresholdRaw : resolveParameter(thresholdRaw.param, model);
+    const threshold = typeof thresholdRaw === "number" ? thresholdRaw : (resolveParameter(thresholdRaw.param, model) ?? 0) * (thresholdRaw.factor ?? 1);
     if (threshold === void 0) return false;
     return OPERATORS[condition.operator](value, threshold);
   }
@@ -137,23 +194,59 @@
     return rules.map((r) => evaluateRule(r, model)).filter((v) => v !== null);
   }
 
+  // src/engine/informe.ts
+  var SEVERIDAD_ORDEN = { bloqueo: 2, ambar: 1, aviso: 1 };
+  function generarInforme(rules, violations, metadata) {
+    const maxSeveridad = violations.reduce((max, v) => Math.max(max, SEVERIDAD_ORDEN[v.severity] ?? 0), 0);
+    const estado = maxSeveridad >= 2 ? "rojo" : maxSeveridad === 1 ? "ambar" : "verde";
+    const documentos = /* @__PURE__ */ new Set();
+    const articulos = /* @__PURE__ */ new Set();
+    for (const rule of rules) {
+      documentos.add(rule.source.document);
+      articulos.add(rule.source.article);
+    }
+    return {
+      estado,
+      violaciones: violations,
+      cobertura: {
+        evalua: [...documentos].sort(),
+        articulos: [...articulos].sort(),
+        noCubre: metadata?.noCubre ?? [],
+        fechaConsulta: metadata?.cobertura?.fechaConsulta
+      }
+    };
+  }
+
   // tests/fixtures/granada-sample.json
   var granada_sample_default = {
     jurisdiction: "Granada (PGOU 2001)",
-    version: "0.2.0",
+    version: "0.3.0",
     vigencia: "PGOU 2001 con adaptaciones posteriores (verificar BOP)",
     rules: [
       {
         id: "GR-RUAIS-01A",
         version: "0.1.0",
         jurisdiction: "Granada (PGOU 2001)",
-        source: { document: "PGOU Granada 2001, T\xEDtulo S\xE9ptimo (Continuaci\xF3n)", article: "7.11.6.2.a" },
-        scope: { calificacion: "RUAIS" },
+        source: {
+          document: "PGOU Granada 2001, T\xEDtulo S\xE9ptimo (Continuaci\xF3n)",
+          article: "7.11.6.2.a"
+        },
+        scope: {
+          calificacion: "RUAIS"
+        },
         conditions: {
           mode: "all",
           items: [
-            { parameter: "edificio.numeroPlantas", operator: "==", value: 1 },
-            { parameter: "edificio.alturaMaxima", operator: ">", value: 4.6 }
+            {
+              parameter: "edificio.numeroPlantas",
+              operator: "==",
+              value: 1
+            },
+            {
+              parameter: "edificio.alturaMaxima",
+              operator: ">",
+              value: 4.6
+            }
           ]
         },
         severity: "bloqueo",
@@ -163,13 +256,26 @@
         id: "GR-RUAIS-01B",
         version: "0.1.0",
         jurisdiction: "Granada (PGOU 2001)",
-        source: { document: "PGOU Granada 2001, T\xEDtulo S\xE9ptimo (Continuaci\xF3n)", article: "7.11.6.2.b" },
-        scope: { calificacion: "RUAIS" },
+        source: {
+          document: "PGOU Granada 2001, T\xEDtulo S\xE9ptimo (Continuaci\xF3n)",
+          article: "7.11.6.2.b"
+        },
+        scope: {
+          calificacion: "RUAIS"
+        },
         conditions: {
           mode: "all",
           items: [
-            { parameter: "edificio.numeroPlantas", operator: "==", value: 2 },
-            { parameter: "edificio.alturaMaxima", operator: ">", value: 7.9 }
+            {
+              parameter: "edificio.numeroPlantas",
+              operator: "==",
+              value: 2
+            },
+            {
+              parameter: "edificio.alturaMaxima",
+              operator: ">",
+              value: 7.9
+            }
           ]
         },
         severity: "bloqueo",
@@ -179,13 +285,26 @@
         id: "GR-RUAIS-01C",
         version: "0.1.0",
         jurisdiction: "Granada (PGOU 2001)",
-        source: { document: "PGOU Granada 2001, T\xEDtulo S\xE9ptimo (Continuaci\xF3n)", article: "7.11.6.2.c" },
-        scope: { calificacion: "RUAIS" },
+        source: {
+          document: "PGOU Granada 2001, T\xEDtulo S\xE9ptimo (Continuaci\xF3n)",
+          article: "7.11.6.2.c"
+        },
+        scope: {
+          calificacion: "RUAIS"
+        },
         conditions: {
           mode: "all",
           items: [
-            { parameter: "edificio.numeroPlantas", operator: "==", value: 3 },
-            { parameter: "edificio.alturaMaxima", operator: ">", value: 11.2 }
+            {
+              parameter: "edificio.numeroPlantas",
+              operator: "==",
+              value: 3
+            },
+            {
+              parameter: "edificio.alturaMaxima",
+              operator: ">",
+              value: 11.2
+            }
           ]
         },
         severity: "bloqueo",
@@ -195,12 +314,21 @@
         id: "GR-RUAIS-02",
         version: "0.1.0",
         jurisdiction: "Granada (PGOU 2001)",
-        source: { document: "PGOU Granada 2001, T\xEDtulo S\xE9ptimo (Continuaci\xF3n)", article: "7.11.3" },
-        scope: { calificacion: "RUAIS" },
+        source: {
+          document: "PGOU Granada 2001, T\xEDtulo S\xE9ptimo (Continuaci\xF3n)",
+          article: "7.11.3"
+        },
+        scope: {
+          calificacion: "RUAIS"
+        },
         conditions: {
           mode: "any",
           items: [
-            { parameter: "edificio.distanciaMinimaLinderos", operator: "<", value: 3 }
+            {
+              parameter: "edificio.distanciaMinimaLinderos",
+              operator: "<",
+              value: 3
+            }
           ]
         },
         severity: "bloqueo",
@@ -210,8 +338,13 @@
         id: "GR-RUAIS-03",
         version: "0.1.0",
         jurisdiction: "Granada (PGOU 2001)",
-        source: { document: "PGOU Granada 2001, T\xEDtulo S\xE9ptimo (Continuaci\xF3n)", article: "7.11.4.1" },
-        scope: { calificacion: "RUAIS" },
+        source: {
+          document: "PGOU Granada 2001, T\xEDtulo S\xE9ptimo (Continuaci\xF3n)",
+          article: "7.11.4.1"
+        },
+        scope: {
+          calificacion: "RUAIS"
+        },
         conditions: {
           mode: "all",
           items: [
@@ -230,12 +363,21 @@
         id: "GR-RUAIS-04B",
         version: "0.1.0",
         jurisdiction: "Granada (PGOU 2001)",
-        source: { document: "PGOU Granada 2001, T\xEDtulo S\xE9ptimo (Continuaci\xF3n)", article: "7.11.8.1.b" },
-        scope: { calificacion: "RUAIS" },
+        source: {
+          document: "PGOU Granada 2001, T\xEDtulo S\xE9ptimo (Continuaci\xF3n)",
+          article: "7.11.8.1.b"
+        },
+        scope: {
+          calificacion: "RUAIS"
+        },
         conditions: {
           mode: "all",
           items: [
-            { parameter: "edificio.numeroPlantas", operator: "==", value: 2 },
+            {
+              parameter: "edificio.numeroPlantas",
+              operator: "==",
+              value: 2
+            },
             {
               numerator: "edificio.superficieEdificadaTotal",
               denominator: "parcela.superficie",
@@ -258,19 +400,135 @@
         conditions: {
           mode: "any",
           items: [
-            { parameter: "patio.anchoMinimo", operator: "<", value: 3 },
             {
               parameter: "patio.anchoMinimo",
               operator: "<",
-              value: { param: "patio.diametroMinimoRequerido" }
+              value: 3
             },
-            { parameter: "patio.superficieUtil", operator: "<", value: 9 }
+            {
+              parameter: "patio.anchoMinimo",
+              operator: "<",
+              value: {
+                param: "patio.diametroMinimoRequerido"
+              }
+            },
+            {
+              parameter: "patio.superficieUtil",
+              operator: "<",
+              value: 9
+            }
           ]
         },
         severity: "bloqueo",
         message: "El patio de luces no cumple las dimensiones m\xEDnimas del art. 7.3.23.2: lado \u2265 3,00 m, c\xEDrculo de di\xE1metro m\xE1x(3 m, H/3), superficie \u2265 9 m\xB2. La anchura m\xEDnima debe mantenerse en toda la altura (art. 7.3.22.3)."
+      },
+      {
+        id: "GR-RPMC-01B",
+        version: "0.1.0",
+        jurisdiction: "Granada (PGOU 2001)",
+        source: {
+          document: "PGOU Granada 2001, T\xEDtulo S\xE9ptimo (Continuaci\xF3n)",
+          article: "7.12.6"
+        },
+        scope: {
+          calificacion: "RPMC"
+        },
+        conditions: {
+          mode: "all",
+          items: [
+            {
+              parameter: "edificio.numeroPlantas",
+              operator: "==",
+              value: 2
+            },
+            {
+              parameter: "edificio.alturaMaxima",
+              operator: ">",
+              value: 7.9
+            }
+          ]
+        },
+        severity: "bloqueo",
+        message: "Edificio de 2 plantas en calificaci\xF3n RPMC: altura m\xE1xima 7,90 m (art. 7.12.6)."
+      },
+      {
+        id: "GR-RPMC-03",
+        version: "0.1.0",
+        jurisdiction: "Granada (PGOU 2001)",
+        source: {
+          document: "PGOU Granada 2001, T\xEDtulo S\xE9ptimo (Continuaci\xF3n)",
+          article: "7.12.4.1"
+        },
+        scope: {
+          calificacion: "RPMC"
+        },
+        conditions: {
+          mode: "all",
+          items: [
+            {
+              numerator: "edificio.superficieOcupadaProyectada",
+              denominator: "parcela.superficie",
+              operator: ">",
+              value: 0.8
+            }
+          ]
+        },
+        severity: "bloqueo",
+        message: "La ocupaci\xF3n m\xE1xima en calificaci\xF3n RPMC es del 80% de la parcela por planta (art. 7.12.4.1)."
+      },
+      {
+        id: "GR-RPMC-04B",
+        version: "0.1.0",
+        jurisdiction: "Granada (PGOU 2001)",
+        source: {
+          document: "PGOU Granada 2001, T\xEDtulo S\xE9ptimo (Continuaci\xF3n)",
+          article: "7.12.8"
+        },
+        scope: {
+          calificacion: "RPMC"
+        },
+        conditions: {
+          mode: "all",
+          items: [
+            {
+              parameter: "edificio.numeroPlantas",
+              operator: "==",
+              value: 2
+            },
+            {
+              numerator: "edificio.superficieEdificadaTotal",
+              denominator: "parcela.superficie",
+              operator: ">",
+              value: 1.6
+            }
+          ]
+        },
+        severity: "bloqueo",
+        message: "Edificio de 2 plantas en RPMC: edificabilidad m\xE1xima 1,60 m\xB2t/m\xB2s (art. 7.12.8)."
       }
-    ]
+    ],
+    noCubre: [
+      "Normativa sectorial (CTE, REBT, RITE) \u2014 pack separado",
+      "Cat\xE1logos de protecci\xF3n y planes especiales",
+      "Condiciones de la calificaci\xF3n no cargadas en esta demo"
+    ],
+    estado: "vigente",
+    cobertura: {
+      fuente: "PGOU Granada 2001, T\xEDtulo S\xE9ptimo",
+      fechaConsulta: "2026-09-17",
+      articulosMapeados: [
+        "7.11.6.2.a",
+        "7.11.6.2.b",
+        "7.11.6.2.c",
+        "7.11.3",
+        "7.11.4.1",
+        "7.11.8.1.b",
+        "7.3.23.2 (patios de luces)",
+        "7.12.6",
+        "7.12.4.1",
+        "7.12.8"
+      ]
+    }
   };
 
   // src/ui/main.ts
@@ -294,15 +552,28 @@
     lateral: "#9ca3af",
     testero: "#7c3aed"
   };
-  function huella(margen) {
-    return [
-      { x: margen, y: margen },
-      { x: ANCHO - margen, y: margen },
-      { x: ANCHO - margen, y: LARGO - margen },
-      { x: margen, y: LARGO - margen }
+  var todasReglas = granada_sample_default.rules;
+  var CALIFICACIONES = [...new Set(todasReglas.filter((r) => r.scope?.calificacion).map((r) => r.scope.calificacion))];
+  var REGLAS_GENERALES = todasReglas.filter((r) => !r.scope?.calificacion);
+  var calificacionActual = CALIFICACIONES[0] ?? "RUAIS";
+  var margenHuella = 2.5;
+  var desplazamiento = { x: 0, y: 0 };
+  var plantas = 2;
+  var altura = 8.2;
+  var superficieEdificada = 300;
+  function huella() {
+    const base = [
+      { x: margenHuella, y: margenHuella },
+      { x: ANCHO - margenHuella, y: margenHuella },
+      { x: ANCHO - margenHuella, y: LARGO - margenHuella },
+      { x: margenHuella, y: LARGO - margenHuella }
     ];
+    return base.map((p) => ({
+      x: Math.max(0.2, Math.min(ANCHO - 0.2, p.x + desplazamiento.x)),
+      y: Math.max(0.2, Math.min(LARGO - 0.2, p.y + desplazamiento.y))
+    }));
   }
-  function construirKernel(margen, plantas, altura, superficieEdificada) {
+  function construirKernel() {
     return {
       parcela: {
         id: "p1",
@@ -312,48 +583,41 @@
         contorno: parcelaContorno,
         linderos,
         cotaReferencia: 0,
-        calificacion: "RUAIS"
+        calificacion: calificacionActual
       },
       edificio: {
         alturaMaxima: altura,
         numeroPlantas: plantas,
         superficieEdificadaTotal: superficieEdificada,
         superficieOcupadaProyectada: 0,
-        huella: huella(margen)
+        huella: huella()
       },
       entities: []
     };
   }
   function puntosSVG(puntos) {
-    return puntos.map((p) => `${p.x * ESCALA},${LARGO - p.y * ESCALA}`).join(" ");
+    return puntos.map((p) => `${p.x * ESCALA},${(LARGO - p.y) * ESCALA}`).join(" ");
   }
-  function renderDibujo(margen, bloqueado) {
+  function renderDibujo(h, bloqueado) {
     const svg = document.getElementById("plano");
-    const svgContent = `
+    svg.innerHTML = `
     <polygon points="${puntosSVG(parcelaContorno)}" fill="#fef3c7" stroke="#d97706" stroke-width="2"/>
     ${linderos.map(
       (l) => `<line x1="${l.a.x * ESCALA}" y1="${(LARGO - l.a.y) * ESCALA}" x2="${l.b.x * ESCALA}" y2="${(LARGO - l.b.y) * ESCALA}" stroke="${COLOR_LINDERO[l.tipo]}" stroke-width="3" stroke-dasharray="6 3"/>`
     ).join("\n")}
-    <polygon points="${puntosSVG(huella(margen))}" fill="${bloqueado ? "#ef444433" : "#22c55e33"}" stroke="${bloqueado ? "#ef4444" : "#16a34a"}" stroke-width="2"/>
+    <polygon id="huella" points="${puntosSVG(h)}" fill="${bloqueado ? "#ef444433" : "#22c55e33"}" stroke="${bloqueado ? "#ef4444" : "#16a34a"}" stroke-width="2" style="cursor: grab;"/>
   `;
-    svg.innerHTML = svgContent;
   }
-  function renderInforme(violaciones, model) {
+  function renderInforme(informe, model) {
     const estado = document.getElementById("estado");
     const lista = document.getElementById("violaciones");
     const edificio = model.edificio;
     const parcela = model.parcela;
-    if (violaciones.length === 0) {
-      estado.textContent = "VERDE \u2014 TRAMITABLE";
-      estado.className = "verde";
-      lista.innerHTML = "<li class='ok'>Sin tachones. El proyecto cumple las reglas cargadas.</li>";
-    } else {
-      estado.textContent = `ROJO \u2014 ${violaciones.length} BLOQUEO${violaciones.length > 1 ? "S" : ""}`;
-      estado.className = "rojo";
-      lista.innerHTML = violaciones.map(
-        (v) => `<li><strong>${v.ruleId}</strong> \u2014 ${v.message}<br/><em>Art.: ${v.source.article} (${v.source.document})</em></li>`
-      ).join("");
-    }
+    estado.textContent = informe.estado === "verde" ? "VERDE \u2014 TRAMITABLE" : `ROJO \u2014 ${informe.violaciones.length} BLOQUEO${informe.violaciones.length > 1 ? "S" : ""}`;
+    estado.className = informe.estado === "verde" ? "verde" : "rojo";
+    lista.innerHTML = informe.violaciones.length === 0 ? "<li class='ok'>Sin tachones. El proyecto cumple las reglas cargadas.</li>" : informe.violaciones.map(
+      (v) => `<li><strong>${v.ruleId}</strong> \u2014 ${v.message}<br/><em>Art.: ${v.source.article} (${v.source.document})</em></li>`
+    ).join("");
     const datos = document.getElementById("datos");
     datos.innerHTML = `
     <tr><td>Superficie de parcela (derivada)</td><td>${parcela.superficie.toFixed(2)} m\xB2</td></tr>
@@ -361,19 +625,81 @@
     <tr><td>Distancia m\xEDnima a lindero (derivada)</td><td>${edificio.distanciaMinimaLinderos !== void 0 ? edificio.distanciaMinimaLinderos.toFixed(2) + " m" : "\u2014"}</td></tr>
     <tr><td>Edificabilidad actual</td><td>${(Number(edificio.superficieEdificadaTotal) / Number(parcela.superficie)).toFixed(2)} m\xB2t/m\xB2s</td></tr>
   `;
+    const cobertura = document.getElementById("cobertura");
+    cobertura.innerHTML = `
+    <p><strong>Eval\xFAa:</strong> ${informe.cobertura.articulos.length} art\xEDculos \u2014 ${informe.cobertura.evalua.join("; ")} \xB7 Calificaci\xF3n ${calificacionActual} + reglas generales</p>
+    <p><strong>NO eval\xFAa (declaraci\xF3n de cobertura):</strong></p>
+    <ul>${(granada_sample_default.noCubre ?? []).map((n) => `<li>${n}</li>`).join("")}</ul>
+  `;
   }
   function recalcular() {
-    const margen = Number(document.getElementById("margen").value);
-    const plantas = Number(document.getElementById("plantas").value);
-    const altura = Number(document.getElementById("altura").value);
-    const superficieEdificada = Number(document.getElementById("edificada").value);
-    const kernel = construirKernel(margen, plantas, altura, superficieEdificada);
+    const reglasCalificacion = todasReglas.filter((r) => r.scope?.calificacion === calificacionActual);
+    const kernel = construirKernel();
     const model = buildModel(kernel);
-    const violaciones = evaluatePack(granada_sample_default.rules, model);
-    document.getElementById("valorMargen").textContent = margen.toFixed(1) + " m";
-    renderDibujo(margen, violaciones.length > 0);
-    renderInforme(violaciones, model);
+    const informe = generarInforme([...REGLAS_GENERALES, ...reglasCalificacion], evaluatePack([...REGLAS_GENERALES, ...reglasCalificacion], model), granada_sample_default);
+    document.getElementById("valorMargen").textContent = margenHuella.toFixed(1) + " m";
+    renderDibujo(kernel.edificio.huella, informe.violaciones.length > 0);
+    renderInforme(informe, model);
   }
-  document.addEventListener("input", recalcular);
+  function configurarDrag() {
+    const svg = document.getElementById("plano");
+    let arrastrando = false;
+    let inicio = null;
+    let desplazamientoInicial = null;
+    svg.addEventListener("pointerdown", (e) => {
+      const huellaEl = e.target.id;
+      if (huellaEl !== "huella") return;
+      arrastrando = true;
+      inicio = { x: e.offsetX, y: e.offsetY };
+      desplazamientoInicial = { ...desplazamiento };
+      e.target.setPointerCapture?.(e.pointerId);
+    });
+    svg.addEventListener("pointermove", (e) => {
+      if (!arrastrando || !inicio || !desplazamientoInicial) return;
+      desplazamiento = {
+        x: desplazamientoInicial.x + (e.offsetX - inicio.x) / ESCALA,
+        y: desplazamientoInicial.y - (e.offsetY - inicio.y) / ESCALA
+      };
+      recalcular();
+    });
+    svg.addEventListener("pointerup", () => {
+      arrastrando = false;
+      inicio = null;
+      desplazamientoInicial = null;
+    });
+  }
+  function inicializarControles() {
+    const selector = document.getElementById("calificacion");
+    selector.innerHTML = CALIFICACIONES.map(
+      (c) => `<option value="${c}" ${c === calificacionActual ? "selected" : ""}>${c}</option>`
+    ).join("");
+    selector.addEventListener("change", () => {
+      calificacionActual = selector.value;
+      recalcular();
+    });
+    const margen = document.getElementById("margen");
+    margen.addEventListener("input", () => {
+      margenHuella = Number(margen.value);
+      desplazamiento = { x: 0, y: 0 };
+      recalcular();
+    });
+    const plantasEl = document.getElementById("plantas");
+    plantasEl.addEventListener("change", () => {
+      plantas = Number(plantasEl.value);
+      recalcular();
+    });
+    const alturaEl = document.getElementById("altura");
+    alturaEl.addEventListener("input", () => {
+      altura = Number(alturaEl.value);
+      recalcular();
+    });
+    const edificadaEl = document.getElementById("edificada");
+    edificadaEl.addEventListener("input", () => {
+      superficieEdificada = Number(edificadaEl.value);
+      recalcular();
+    });
+  }
+  inicializarControles();
+  configurarDrag();
   recalcular();
 })();

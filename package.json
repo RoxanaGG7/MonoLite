@@ -6,7 +6,7 @@
   "scripts": {
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
-    "build:web": "esbuild src/ui/main.ts --bundle --format=iife --outfile=docs/app.js"
+    "build:web": "esbuild src/ui/main.ts --bundle --format=iife --outfile=app.js"
   },
   "devDependencies": {
     "@types/node": "^22.10.0",
