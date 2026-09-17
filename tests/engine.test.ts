@@ -708,6 +708,70 @@ describe("constructor de modelos (geometría → parámetros derivados)", () => 
     ).toBeNull();
   });
 
+  it("construcciones sobre altura máxima por calificación: 12 m² en RUAIS, 17 en RPMC", () => {
+    const sobreAltura = (id: string, m2: number, article: string): Rule => ({
+      id,
+      version: "0.1.0",
+      jurisdiction: "Granada",
+      source: { document: "PGOU 2001", article },
+      conditions: {
+        mode: "any",
+        items: [
+          { parameter: "edificio.superficieConstruccionesSobreAltura", operator: ">", value: m2 },
+          { parameter: "edificio.alturaConstruccionesSobreAltura", operator: ">", value: 3.3 },
+        ],
+      },
+      severity: "bloqueo",
+      message: "Sobre altura máx.",
+    });
+    const ruais = sobreAltura("GR-RUAIS-09", 12, "7.11.7");
+    const rpmc = sobreAltura("GR-RPMC-09", 17, "7.12.7");
+    const modelo = { edificio: { superficieConstruccionesSobreAltura: 15, alturaConstruccionesSobreAltura: 3 } };
+    expect(evaluateRule(ruais, modelo)).not.toBeNull();
+    expect(evaluateRule(rpmc, modelo)).toBeNull();
+    expect(
+      evaluateRule(rpmc, { edificio: { superficieConstruccionesSobreAltura: 10, alturaConstruccionesSobreAltura: 3.5 } })
+    ).not.toBeNull();
+  });
+
+  it("sótano en Patio de Manzana: ocupación + 20% del patio vía cómputo (art. 7.14.5)", () => {
+    const computo: ComputationRule = {
+      id: "GR-URB-COMPUTO-03",
+      version: "0.1.0",
+      jurisdiction: "Granada",
+      source: { document: "PGOU 2001", article: "7.14.5" },
+      target: "edificio.sotanoMaximoPM",
+      formula: [
+        { param: "edificio.superficieOcupadaProyectada", coef: 1 },
+        { param: "patioManzana.superficieUtil", coef: 0.2 },
+      ],
+    };
+    const regla: Rule = {
+      id: "GR-PM-10",
+      version: "0.1.0",
+      jurisdiction: "Granada",
+      source: { document: "PGOU 2001", article: "7.14.5" },
+      conditions: {
+        mode: "any",
+        items: [
+          {
+            parameter: "edificio.superficieSotano",
+            operator: ">",
+            value: { param: "edificio.sotanoMaximoPM" },
+          },
+        ],
+      },
+      severity: "bloqueo",
+      message: "Sótano excede ocupación + 20% del patio de manzana.",
+    };
+    const base = { edificio: { superficieOcupadaProyectada: 150, superficieSotano: 170 }, patioManzana: { superficieUtil: 100 } };
+    const conforme = applyComputations([computo], base as never);
+    expect((conforme.edificio as Record<string, number>).sotanoMaximoPM).toBe(170);
+    expect(evaluateRule(regla, conforme)).toBeNull();
+    const excesivo = applyComputations([computo], { ...base, edificio: { ...base.edificio, superficieSotano: 171 } } as never);
+    expect(evaluateRule(regla, excesivo)).not.toBeNull();
+  });
+
   it("el modelo derivado dispara las reglas RUAIS reales de retranqueo y edificabilidad", () => {
     const model = buildModel(kernel);
     const retranqueo: Rule = {

@@ -6,6 +6,7 @@ const PACK_PATH = resolve(process.cwd(), "Docs-Internal", "packs", "urbanismo-gr
 const CALIFICACIONES = [
   {
     codigo: "RUMC",
+    sobreAltura: { m2: 12, articulo: "7.9.7" },
     sotanoPerimetro: { limite: "parcela", articulo: "7.9.5.2" },
     nombre: "Residencial Unifamiliar en Manzana Cerrada",
     parcela: { superficie: 80, frente: 5 },
@@ -23,6 +24,7 @@ const CALIFICACIONES = [
   },
   {
     codigo: "RUAL",
+    sobreAltura: { m2: 12, articulo: "7.10.8" },
     frenteMaximo: { valor: 40, articulo: "7.10.7" },
     sotanoPerimetro: { limite: "parcela", articulo: "7.10.5.2" },
     nombre: "Residencial Unifamiliar en Asociaciones Lineales",
@@ -41,6 +43,7 @@ const CALIFICACIONES = [
   },
   {
     codigo: "RUAIS",
+    sobreAltura: { m2: 12, articulo: "7.11.7" },
     sotanoPerimetro: { limite: "ocupacion", articulo: "7.11.5.2" },
     nombre: "Residencial Unifamiliar Aislada",
     parcela: { superficie: 250, frente: 10 },
@@ -58,6 +61,7 @@ const CALIFICACIONES = [
   },
   {
     codigo: "RPMC",
+    sobreAltura: { m2: 17, articulo: "7.12.7" },
     frenteMaximo: { valor: 60, articulo: "7.12.10" },
     sotanoPerimetro: { limite: "parcela", articulo: "7.12.5.2" },
     nombre: "Residencial Plurifamiliar en Manzana Cerrada",
@@ -76,6 +80,7 @@ const CALIFICACIONES = [
   },
   {
     codigo: "RPBA",
+    sobreAltura: { m2: 17, articulo: "7.13.9" },
     frenteMaximo: { valor: 60, articulo: "7.13.12" },
     sotanoPerimetro: { limite: "ocupacion", articulo: "7.13.6.2" },
     nombre: "Residencial Plurifamiliar en Bloques Abiertos",
@@ -94,6 +99,7 @@ const CALIFICACIONES = [
   },
   {
     codigo: "PM",
+    sobreAltura: { m2: 17, articulo: "7.14.7" },
     frenteMaximo: { valor: 60, articulo: "7.14.10" },
     nombre: "Residencial Plurifamiliar en Patio de Manzana",
     parcela: { superficie: 500, frente: null },
@@ -111,6 +117,7 @@ const CALIFICACIONES = [
   },
   {
     codigo: "IM",
+    sobreAltura: { m2: 17, articulo: "7.16.7" },
     nombre: "Industrial en Manzana",
     parcela: { superficie: 200, frente: 8 },
     ocupacion: 0.75,
@@ -126,6 +133,7 @@ const CALIFICACIONES = [
   },
   {
     codigo: "IA",
+    sobreAltura: { m2: 17, articulo: "7.17.7" },
     nombre: "Industrial Aislada",
     parcela: { superficie: 1000, frente: 20 },
     ocupacion: 0.5,
@@ -317,6 +325,24 @@ function generar(c) {
         },
         "bloqueo",
         `En calificación ${c.nombre} no se admiten frentes continuos de fachada de longitud superior a ${c.frenteMaximo.valor} m (art. ${c.frenteMaximo.articulo}).`
+      )
+    );
+  }
+
+  if (c.sobreAltura) {
+    rules.push(
+      regla(
+        `GR-${c.codigo}-09`,
+        c.sobreAltura.articulo,
+        {
+          mode: "any",
+          items: [
+            { parameter: "edificio.superficieConstruccionesSobreAltura", operator: ">", value: c.sobreAltura.m2 },
+            { parameter: "edificio.alturaConstruccionesSobreAltura", operator: ">", value: 3.3 },
+          ],
+        },
+        "bloqueo",
+        `Las construcciones permitidas por encima de la altura máxima en calificación ${c.nombre} no sobrepasarán ${c.sobreAltura.m2} m² ni 330 cm de altura (art. ${c.sobreAltura.articulo}).`
       )
     );
   }

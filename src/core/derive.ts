@@ -35,6 +35,7 @@ export function buildModel(kernel: KernelModel): Record<string, unknown> {
   };
   if (kernel.patio) model.patio = derivePatio(kernel.patio);
   if (kernel.patioVentilacion) model.patioVentilacion = derivePatio(kernel.patioVentilacion);
+  if (kernel.patioManzana) model.patioManzana = { ...kernel.patioManzana };
   if (kernel.espacio) model.espacio = { ...kernel.espacio };
 
   if (kernel.edificio.huellaSotano && kernel.edificio.huellaSotano.length >= 3) {

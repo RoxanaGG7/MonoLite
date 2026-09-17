@@ -83,6 +83,8 @@ export interface Edificio {
   pendienteCubierta?: number;
   cubiertaSobreAlturaMaxima?: number;
   huellaSotano?: Punto[];
+  superficieConstruccionesSobreAltura?: number;
+  alturaConstruccionesSobreAltura?: number;
 }
 
 export interface EdificioDerived extends Edificio {
@@ -121,6 +123,7 @@ export interface KernelModel {
   edificios?: Edificio[];
   patio?: Patio;
   patioVentilacion?: Patio;
+  patioManzana?: Patio;
   espacio?: Espacio;
   entities: BaseEntity[];
 }
