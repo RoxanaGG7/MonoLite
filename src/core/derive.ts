@@ -7,6 +7,12 @@ export function buildModel(kernel: KernelModel): Record<string, unknown> {
   if (kernel.parcela.contorno && kernel.parcela.contorno.length >= 3) {
     parcela.superficie = areaPoligono(kernel.parcela.contorno);
   }
+  const frontales = kernel.parcela.linderos.filter((l) => l.tipo === "frontal");
+  if (frontales.length > 0) {
+    parcela.longitudLinderoFrontal = Math.max(
+      ...frontales.map((l) => Math.hypot(l.b.x - l.a.x, l.b.y - l.a.y))
+    );
+  }
 
   const edificio: Record<string, unknown> = { ...deriveEdificio(kernel.edificio) };
   if (kernel.edificio.huella.length >= 3) {

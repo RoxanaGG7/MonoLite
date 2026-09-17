@@ -67,10 +67,19 @@ export interface Edificio {
   cerramientoAzoteaRejadoAltura?: number;
   depositoAguaSobreAlturaMaxima?: number;
   cotaForjadoPBSobreReferencia?: number;
+  cotaForjadoSemisotanoSobreReferencia?: number;
   separacionForjadoPBTerreno?: number;
   tieneSotanos?: number;
+  numeroSotanos?: number;
   alturaLibreMinimaSotano?: number;
   alturaLibre75PorCientoPB?: number;
+  superficiePlantaBaja?: number;
+  superficieEntreplanta?: number;
+  separacionEntreplantaFachada?: number;
+  superficiePlantasSobreRasante?: number;
+  superficieCuerposSalientesCubiertosCerrados?: number;
+  superficieCuerposSalientesCubiertosAbiertos?: number;
+  superficieCuartosServicio?: number;
 }
 
 export interface EdificioDerived extends Edificio {

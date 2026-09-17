@@ -30,6 +30,20 @@ export interface RuleSource {
   vigencia?: string;
 }
 
+export interface ComputationTerm {
+  param: string;
+  coef: number;
+}
+
+export interface ComputationRule {
+  id: string;
+  version: string;
+  jurisdiction: string;
+  source: RuleSource;
+  target: string;
+  formula: ComputationTerm[];
+}
+
 export interface Rule {
   id: string;
   version: string;

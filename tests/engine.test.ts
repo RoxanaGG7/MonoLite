@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { evaluatePack, evaluateRule } from "../src/engine/evaluator.js";
-import type { Rule } from "../src/engine/rule.js";
+import type { Rule, ComputationRule } from "../src/engine/rule.js";
+import { applyComputations } from "../src/engine/computation.js";
 import { loadPack } from "../src/engine/loader.js";
 import { deriveEdificio, derivePatio, type KernelModel, type Lindero, type Punto } from "../src/core/kernel.js";
 import { buildModel } from "../src/core/derive.js";
@@ -347,6 +348,114 @@ describe("reglas generales v0.2 (GR-URB-06 a 10)", () => {
   });
 });
 
+describe("reglas generales v0.3: sótanos y entreplantas", () => {
+  const rule = (id: string, article: string, items: Rule["conditions"]["items"], mode: "all" | "any" = "any"): Rule => ({
+    id,
+    version: "0.1.0",
+    jurisdiction: "Granada",
+    source: { document: "PGOU 2001", article },
+    conditions: { mode, items },
+    severity: "bloqueo",
+    message: id,
+  });
+
+  it("semisótano: forjado de techo máximo a +1,30 m de la cota de referencia (art. 7.3.18.b)", () => {
+    const r = rule("GR-URB-07C", "7.3.18.b", [
+      { parameter: "edificio.cotaForjadoSemisotanoSobreReferencia", operator: ">", value: 1.3 },
+    ]);
+    expect(evaluateRule(r, { edificio: { cotaForjadoSemisotanoSobreReferencia: 1.45 } })).not.toBeNull();
+    expect(evaluateRule(r, { edificio: { cotaForjadoSemisotanoSobreReferencia: 1.2 } })).toBeNull();
+  });
+
+  it("número de sótanos no puede exceder de cuatro (art. 7.3.19.2)", () => {
+    const r = rule("GR-URB-08C", "7.3.19.2", [
+      { parameter: "edificio.numeroSotanos", operator: ">", value: 4 },
+    ]);
+    expect(evaluateRule(r, { edificio: { numeroSotanos: 5 } })).not.toBeNull();
+    expect(evaluateRule(r, { edificio: { numeroSotanos: 4 } })).toBeNull();
+  });
+
+  it("entreplanta: máximo 50% de la planta baja y retranqueada 3 m de fachada (art. 7.3.19.3)", () => {
+    const superficie = rule("GR-URB-08D", "7.3.19.3", [
+      { numerator: "edificio.superficieEntreplanta", denominator: "edificio.superficiePlantaBaja", operator: ">", value: 0.5 },
+    ], "all");
+    const retranqueo = rule("GR-URB-08E", "7.3.19.3", [
+      { parameter: "edificio.separacionEntreplantaFachada", operator: "<", value: 3 },
+    ]);
+    const excesiva = { edificio: { superficieEntreplanta: 60, superficiePlantaBaja: 100 } };
+    const conforme = { edificio: { superficieEntreplanta: 45, superficiePlantaBaja: 100, separacionEntreplantaFachada: 3.5 } };
+    expect(evaluateRule(superficie, excesiva)).not.toBeNull();
+    expect(evaluateRule(superficie, conforme)).toBeNull();
+    expect(evaluateRule(retranqueo, { edificio: { separacionEntreplantaFachada: 2 } })).not.toBeNull();
+    expect(evaluateRule(retranqueo, conforme)).toBeNull();
+  });
+});
+
+describe("regla de cómputo (art. 7.3.13): el takeoff nace normado", () => {
+  const computo: ComputationRule = {
+    id: "GR-URB-COMPUTO-01",
+    version: "0.1.0",
+    jurisdiction: "Granada",
+    source: { document: "PGOU 2001", article: "7.3.13" },
+    target: "edificio.superficieEdificadaTotal",
+    formula: [
+      { param: "edificio.superficiePlantasSobreRasante", coef: 1 },
+      { param: "edificio.superficieCuerposSalientesCubiertosCerrados", coef: 1 },
+      { param: "edificio.superficieCuerposSalientesCubiertosAbiertos", coef: 0.5 },
+      { param: "edificio.superficieCuartosServicio", coef: 1 },
+    ],
+  };
+
+  const modeloComponentes = (plantas: number, cerrados: number, abiertos: number, servicios: number) => ({
+    edificio: {
+      numeroPlantas: 2,
+      superficiePlantasSobreRasante: plantas,
+      superficieCuerposSalientesCubiertosCerrados: cerrados,
+      superficieCuerposSalientesCubiertosAbiertos: abiertos,
+      superficieCuartosServicio: servicios,
+      superficieEdificadaTotal: 999,
+    },
+    parcela: { superficie: 500 },
+  });
+
+  it("computa la superficie edificada: plantas + cerrados + 50% abiertos + servicios", () => {
+    const model = applyComputations([computo], modeloComponentes(235, 10, 20, 5) as never);
+    expect((model.edificio as Record<string, number>).superficieEdificadaTotal).toBe(235 + 10 + 10 + 5);
+  });
+
+  it("el valor computado reemplaza el manual y alimenta la regla de edificabilidad", () => {
+    const edifRule: Rule = {
+      id: "GR-RUAIS-04B",
+      version: "0.1.0",
+      jurisdiction: "Granada",
+      source: { document: "PGOU 2001", article: "7.11.8.1.b" },
+      conditions: {
+        mode: "all",
+        items: [
+          { parameter: "edificio.numeroPlantas", operator: "==", value: 2 },
+          {
+            numerator: "edificio.superficieEdificadaTotal",
+            denominator: "parcela.superficie",
+            operator: ">",
+            value: 0.6,
+          },
+        ],
+      },
+      severity: "bloqueo",
+      message: "Edificabilidad máxima RUAIS 2 plantas: 0,60.",
+    };
+    const model = applyComputations([computo], modeloComponentes(235, 10, 20, 5) as never);
+    expect(evaluateRule(edifRule, model)).toBeNull();
+    const excesivo = applyComputations([computo], modeloComponentes(320, 10, 20, 5) as never);
+    expect(evaluateRule(edifRule, excesivo)).not.toBeNull();
+  });
+
+  it("sin componentes no computa (el valor manual se respeta)", () => {
+    const model = applyComputations([computo], { edificio: { superficieEdificadaTotal: 300 } });
+    expect((model.edificio as Record<string, number>).superficieEdificadaTotal).toBe(300);
+  });
+});
+
 describe("constructor de modelos (geometría → parámetros derivados)", () => {
   const kernel: KernelModel = {
     parcela: {
@@ -389,6 +498,11 @@ describe("constructor de modelos (geometría → parámetros derivados)", () => 
     const edificio = model.edificio as Record<string, number>;
     expect(edificio.superficieOcupadaProyectada).toBe(150);
     expect(edificio.distanciaMinimaLinderos).toBe(2.5);
+  });
+
+  it("deriva la longitud del lindero frontal desde la geometría", () => {
+    const model = buildModel(kernel);
+    expect((model.parcela as { longitudLinderoFrontal: number }).longitudLinderoFrontal).toBe(20);
   });
 
   it("el modelo derivado dispara las reglas RUAIS reales de retranqueo y edificabilidad", () => {

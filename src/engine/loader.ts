@@ -1,11 +1,12 @@
 import { readFileSync } from "node:fs";
-import type { Rule } from "./rule.js";
+import type { ComputationRule, Rule } from "./rule.js";
 
 export interface Pack {
   jurisdiction: string;
   version: string;
   vigencia?: string;
   rules: Rule[];
+  computos?: ComputationRule[];
 }
 
 export function parsePack(raw: string): Pack {
@@ -19,6 +20,11 @@ export function parsePack(raw: string): Pack {
   for (const rule of data.rules) {
     if (!rule.id || !rule.conditions || !rule.source?.article) {
       throw new Error(`Pack inválido: regla incompleta (${rule.id ?? "sin id"})`);
+    }
+  }
+  for (const computo of data.computos ?? []) {
+    if (!computo.id || !computo.target || !Array.isArray(computo.formula) || computo.formula.length === 0) {
+      throw new Error(`Pack inválido: cómputo incompleto (${computo.id ?? "sin id"})`);
     }
   }
   return data;
