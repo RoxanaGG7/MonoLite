@@ -1,0 +1,8 @@
+﻿Docs-Internal/
+node_modules/
+
+# Documentos no-commiteables (política: no revelar la receta)
+*.pdf
+*.docx
+*.pptx
+*.xlsx

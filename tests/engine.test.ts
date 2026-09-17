@@ -1,0 +1,391 @@
+import { describe, expect, it } from "vitest";
+import { evaluatePack, evaluateRule } from "../src/engine/evaluator.js";
+import type { Rule } from "../src/engine/rule.js";
+import { loadPack } from "../src/engine/loader.js";
+import { deriveEdificio, derivePatio, type Lindero, type Punto } from "../src/core/kernel.js";
+import {
+  areaPoligono,
+  distanciaMinimaLinderos,
+  distanciaPuntoSegmento,
+} from "../src/core/geometry.js";
+import { getCapabilities } from "../src/ai/capabilities.js";
+import { resolve } from "node:path";
+
+const patioRule: Rule = {
+  id: "TEST-URB-05",
+  version: "0.1.0",
+  jurisdiction: "test",
+  source: { document: "Doc de prueba", article: "1.2.3" },
+  conditions: {
+    mode: "any",
+    items: [
+      { parameter: "patio.anchoMinimo", operator: "<", value: 3 },
+      {
+        parameter: "patio.anchoMinimo",
+        operator: "<",
+        value: { param: "patio.diametroMinimoRequerido" },
+      },
+      { parameter: "patio.superficieUtil", operator: "<", value: 9 },
+    ],
+  },
+  severity: "bloqueo",
+  message: "Patio no cumple dimensiones mínimas.",
+};
+
+function modelWithPatio(ancho: number, largo: number, superficie: number, altura: number) {
+  const patio = derivePatio({ anchoMinimo: ancho, largoMinimo: largo, superficieUtil: superficie, alturaVinculada: altura });
+  return { patio };
+}
+
+describe("motor de reglas (L0 — determinista)", () => {
+  it("bloquea un patio con lado menor al mínimo legal", () => {
+    const violation = evaluateRule(patioRule, modelWithPatio(2.4, 5, 12, 9));
+    expect(violation).not.toBeNull();
+    expect(violation?.severity).toBe("bloqueo");
+    expect(violation?.source.article).toBe("1.2.3");
+  });
+
+  it("bloquea un patio de 3,2 m cuando la altura exige círculo mayor (H/3)", () => {
+    const violation = evaluateRule(patioRule, modelWithPatio(3.2, 5, 12, 21));
+    expect(violation).not.toBeNull();
+    expect((violation?.failed[0] as { parameter: string }).parameter).toBe("patio.anchoMinimo");
+  });
+
+  it("pasa un patio que cumple lado, círculo y superficie", () => {
+    expect(evaluateRule(patioRule, modelWithPatio(3.6, 5, 11, 10.8))).toBeNull();
+  });
+
+  it("un pack sin violaciones devuelve informe verde", () => {
+    expect(evaluatePack([patioRule], modelWithPatio(3.6, 5, 11, 10.8))).toHaveLength(0);
+  });
+
+  it("parámetro ausente no viola (regla no aplicable)", () => {
+    expect(evaluateRule(patioRule, { patio: { superficieUtil: 10 } as never })).toBeNull();
+  });
+
+  it("regla all-mode: altura RUAIS de 2 plantas se bloquea solo al superar 7,90 m", () => {
+    const alturaRule: Rule = {
+      id: "GR-RUAIS-01B",
+      version: "0.1.0",
+      jurisdiction: "Granada",
+      source: { document: "PGOU 2001", article: "7.11.6.2.b" },
+      conditions: {
+        mode: "all",
+        items: [
+          { parameter: "edificio.numeroPlantas", operator: "==", value: 2 },
+          { parameter: "edificio.alturaMaxima", operator: ">", value: 7.9 },
+        ],
+      },
+      severity: "bloqueo",
+      message: "Altura máxima 2 plantas RUAIS: 7,90 m.",
+    };
+    expect(evaluateRule(alturaRule, { edificio: { numeroPlantas: 2, alturaMaxima: 8.2 } })).not.toBeNull();
+    expect(evaluateRule(alturaRule, { edificio: { numeroPlantas: 2, alturaMaxima: 7.5 } })).toBeNull();
+    expect(evaluateRule(alturaRule, { edificio: { numeroPlantas: 1, alturaMaxima: 8.2 } })).toBeNull();
+  });
+
+  it("condición de ratio: ocupación RUAIS 30% se bloquea al superarla", () => {
+    const ocupacionRule: Rule = {
+      id: "GR-RUAIS-03",
+      version: "0.1.0",
+      jurisdiction: "Granada",
+      source: { document: "PGOU 2001", article: "7.11.4.1" },
+      conditions: {
+        mode: "all",
+        items: [
+          {
+            numerator: "edificio.superficieOcupadaProyectada",
+            denominator: "parcela.superficie",
+            operator: ">",
+            value: 0.3,
+          },
+        ],
+      },
+      severity: "bloqueo",
+      message: "Ocupación máxima RUAIS: 30%.",
+    };
+    const model = (ocupada: number) => ({
+      edificio: { superficieOcupadaProyectada: ocupada },
+      parcela: { superficie: 400 },
+    });
+    expect(evaluateRule(ocupacionRule, model(130))).not.toBeNull();
+    expect(evaluateRule(ocupacionRule, model(110))).toBeNull();
+  });
+
+  it("edificabilidad RUAIS por plantas: 0,60 con 2 plantas, pero válida con 3", () => {
+    const edifRule: Rule = {
+      id: "GR-RUAIS-04B",
+      version: "0.1.0",
+      jurisdiction: "Granada",
+      source: { document: "PGOU 2001", article: "7.11.8.1.b" },
+      conditions: {
+        mode: "all",
+        items: [
+          { parameter: "edificio.numeroPlantas", operator: "==", value: 2 },
+          {
+            numerator: "edificio.superficieEdificadaTotal",
+            denominator: "parcela.superficie",
+            operator: ">",
+            value: 0.6,
+          },
+        ],
+      },
+      severity: "bloqueo",
+      message: "Edificabilidad máxima RUAIS 2 plantas: 0,60.",
+    };
+    const model = (plantas: number) => ({
+      edificio: { numeroPlantas: plantas, superficieEdificadaTotal: 800 },
+      parcela: { superficie: 1200 },
+    });
+    expect(evaluateRule(edifRule, model(2))).not.toBeNull();
+    expect(evaluateRule(edifRule, model(3))).toBeNull();
+  });
+
+  it("ratio con denominador cero no viola (regla no evaluable)", () => {
+    const rule: Rule = {
+      id: "RATIO-0",
+      version: "0.1.0",
+      jurisdiction: "test",
+      source: { document: "t", article: "t" },
+      conditions: {
+        mode: "all",
+        items: [
+          { numerator: "a.x", denominator: "b.y", operator: ">", value: 0.1 },
+        ],
+      },
+      severity: "bloqueo",
+      message: "ratio",
+    };
+    expect(evaluateRule(rule, { a: { x: 1 }, b: { y: 0 } })).toBeNull();
+  });
+});
+
+describe("geometría del núcleo (distancias a linderos)", () => {
+  const linderos: Lindero[] = [
+    { tipo: "frontal", a: { x: 0, y: 0 }, b: { x: 20, y: 0 } },
+    { tipo: "lateral", a: { x: 0, y: 0 }, b: { x: 0, y: 15 } },
+    { tipo: "testero", a: { x: 20, y: 15 }, b: { x: 0, y: 15 } },
+  ];
+  const huella = (margen: number): Punto[] => [
+    { x: margen, y: margen },
+    { x: 20 - margen, y: margen },
+    { x: 20 - margen, y: 15 - margen },
+    { x: margen, y: 15 - margen },
+  ];
+  const retranqueoRule: Rule = {
+    id: "GR-RUAIS-02",
+    version: "0.1.0",
+    jurisdiction: "Granada",
+    source: { document: "PGOU 2001", article: "7.11.3" },
+    conditions: {
+      mode: "any",
+      items: [{ parameter: "edificio.distanciaMinimaLinderos", operator: "<", value: 3 }],
+    },
+    severity: "bloqueo",
+    message: "Retranqueo mínimo RUAIS: 3,00 m a todos los linderos.",
+  };
+
+  it("distancia perpendicular punto-segmento es exacta", () => {
+    expect(distanciaPuntoSegmento({ x: 5, y: 3 }, { x: 0, y: 0 }, { x: 10, y: 0 })).toBe(3);
+  });
+
+  it("la distancia se clampea al extremo del segmento", () => {
+    expect(distanciaPuntoSegmento({ x: 15, y: 4 }, { x: 0, y: 0 }, { x: 10, y: 0 })).toBeCloseTo(Math.hypot(5, 4), 10);
+  });
+
+  it("huella a 2,5 m del lindero: violación del retranqueo RUAIS", () => {
+    const distancia = distanciaMinimaLinderos(huella(2.5), linderos);
+    expect(distancia).toBe(2.5);
+    const violation = evaluateRule(retranqueoRule, {
+      edificio: { distanciaMinimaLinderos: distancia! },
+    });
+    expect(violation?.ruleId).toBe("GR-RUAIS-02");
+  });
+
+  it("huella a 3,5 m de todos los linderos: conforme", () => {
+    const distancia = distanciaMinimaLinderos(huella(3.5), linderos);
+    expect(evaluateRule(retranqueoRule, {
+      edificio: { distanciaMinimaLinderos: distancia! },
+    })).toBeNull();
+  });
+
+  it("área del polígono (fórmula del shoelace)", () => {
+    expect(areaPoligono(huella(2.5))).toBe(15 * 10);
+  });
+
+  it("sin huella suficiente no evalúa (regla no aplicable)", () => {
+    expect(distanciaMinimaLinderos([{ x: 0, y: 0 }], linderos)).toBeUndefined();
+  });
+
+  it("coordenadas reales (EPSG:25830, UTM 30N): distancias exactas a escala de catastro", () => {
+    const utmLinderos: Lindero[] = [
+      {
+        tipo: "frontal",
+        a: { x: 455000, y: 4130000 },
+        b: { x: 455020, y: 4130000 },
+      },
+      {
+        tipo: "lateral",
+        a: { x: 455000, y: 4130000 },
+        b: { x: 455000, y: 4130015 },
+      },
+    ];
+    const huellaUTM: Punto[] = [
+      { x: 455002.5, y: 4130002.5 },
+      { x: 455017.5, y: 4130002.5 },
+      { x: 455017.5, y: 4130012.5 },
+      { x: 455002.5, y: 4130012.5 },
+    ];
+    expect(distanciaMinimaLinderos(huellaUTM, utmLinderos)).toBe(2.5);
+  });
+});
+
+describe("reglas generales v0.2 (GR-URB-06 a 10)", () => {
+  it("cumbrera derivada: altura máxima 7,90 m permite cumbrera hasta 9,90 m", () => {
+    const edificio = deriveEdificio({ alturaMaxima: 7.9 } as never);
+    expect(edificio.cumbreraMaxima).toBe(9.9);
+    const rule: Rule = {
+      id: "GR-URB-06A",
+      version: "0.1.0",
+      jurisdiction: "Granada",
+      source: { document: "PGOU 2001", article: "7.3.17" },
+      conditions: {
+        mode: "any",
+        items: [
+          {
+            parameter: "edificio.alturaCumbrera",
+            operator: ">",
+            value: { param: "edificio.cumbreraMaxima" },
+          },
+        ],
+      },
+      severity: "bloqueo",
+      message: "Cumbrera máx +2 m sobre última planta.",
+    };
+    const model = { edificio: deriveEdificio({ alturaMaxima: 7.9, alturaCumbrera: 10.2 } as never) };
+    expect(evaluateRule(rule, model)).not.toBeNull();
+    const ok = { edificio: deriveEdificio({ alturaMaxima: 7.9, alturaCumbrera: 9.5 } as never) };
+    expect(evaluateRule(rule, ok)).toBeNull();
+  });
+
+  it("prohibición expresa: depósito de agua sobre altura máxima (art. 7.3.17)", () => {
+    const rule: Rule = {
+      id: "GR-URB-06D",
+      version: "0.1.0",
+      jurisdiction: "Granada",
+      source: { document: "PGOU 2001", article: "7.3.17" },
+      conditions: {
+        mode: "any",
+        items: [
+          { parameter: "edificio.depositoAguaSobreAlturaMaxima", operator: "==", value: 1 },
+        ],
+      },
+      severity: "bloqueo",
+      message: "Prohibido depósito de agua sobre altura máxima.",
+    };
+    expect(evaluateRule(rule, { edificio: { depositoAguaSobreAlturaMaxima: 1 } })).not.toBeNull();
+    expect(evaluateRule(rule, { edificio: { depositoAguaSobreAlturaMaxima: 0 } })).toBeNull();
+  });
+
+  it("patio de ventilación usa H/5 y mínimos de 2 m / 4 m² (art. 7.3.23.1)", () => {
+    const patioVentilacion = derivePatio({
+      tipo: "ventilacion",
+      anchoMinimo: 2.2,
+      largoMinimo: 3,
+      superficieUtil: 5,
+      alturaVinculada: 15,
+    });
+    expect(patioVentilacion.diametroMinimoRequerido).toBe(3);
+    const rule: Rule = {
+      id: "GR-URB-10",
+      version: "0.1.0",
+      jurisdiction: "Granada",
+      source: { document: "PGOU 2001", article: "7.3.23.1" },
+      conditions: {
+        mode: "any",
+        items: [
+          { parameter: "patioVentilacion.anchoMinimo", operator: "<", value: 2 },
+          {
+            parameter: "patioVentilacion.anchoMinimo",
+            operator: "<",
+            value: { param: "patioVentilacion.diametroMinimoRequerido" },
+          },
+          { parameter: "patioVentilacion.superficieUtil", operator: "<", value: 4 },
+        ],
+      },
+      severity: "bloqueo",
+      message: "Patio de ventilación insuficiente.",
+    };
+    expect(evaluateRule(rule, { patioVentilacion })).not.toBeNull();
+  });
+
+  it("iluminación de pieza habitable: ratio 1/10 de superficie útil (art. 7.4.6.1)", () => {
+    const rule: Rule = {
+      id: "GR-URB-09A",
+      version: "0.1.0",
+      jurisdiction: "Granada",
+      source: { document: "PGOU 2001", article: "7.4.6.1" },
+      conditions: {
+        mode: "any",
+        items: [
+          {
+            numerator: "espacio.superficieHuecosIluminacion",
+            denominator: "espacio.superficie",
+            operator: "<",
+            value: 0.1,
+          },
+        ],
+      },
+      severity: "bloqueo",
+      message: "Huecos de iluminación insuficientes.",
+    };
+    const oscuro = { espacio: { superficie: 20, superficieHuecosIluminacion: 1.5 } };
+    const iluminado = { espacio: { superficie: 20, superficieHuecosIluminacion: 2.2 } };
+    expect(evaluateRule(rule, oscuro)).not.toBeNull();
+    expect(evaluateRule(rule, iluminado)).toBeNull();
+  });
+});
+
+describe("pack legible por máquina (fixture Granada, GR-URB-05 real)", () => {
+  const pack = loadPack(resolve("tests", "fixtures", "granada-sample.json"));
+
+  it("carga el pack con jurisdicción y regla citable", () => {
+    expect(pack.jurisdiction).toContain("Granada");
+    expect(pack.rules).toHaveLength(1);
+    expect(pack.rules[0].source.article).toContain("7.3.23.2");
+  });
+
+  it("la regla real del PGOU bloquea un patio de 2,5 m (art. 7.3.23.2)", () => {
+    const violations = evaluatePack(pack.rules, modelWithPatio(2.5, 4, 10, 9));
+    expect(violations).toHaveLength(1);
+    expect(violations[0].ruleId).toBe("GR-URB-05");
+    expect(violations[0].message).toContain("7.3.23.2");
+  });
+
+  it("la regla real del PGOU pasa un patio conforme", () => {
+    expect(evaluatePack(pack.rules, modelWithPatio(3.5, 4.2, 15, 9))).toHaveLength(0);
+  });
+
+  it("un pack malformado es rechazado por el loader", () => {
+    expect(() => loadPack(resolve("tests", "fixtures", "no-existe.json"))).toThrow();
+  });
+});
+
+describe("capacidades de IA (degradación elegante)", () => {
+  it("sin GPU Flow configurado, todo el producto sigue en L0", () => {
+    const caps = getCapabilities({});
+    expect(caps.l2).toBe(false);
+    expect(caps.l3).toBe(false);
+    expect(caps.embeddings).toBe(false);
+  });
+
+  it("con modelo L2 configurado, la capacidad se enciende", () => {
+    const caps = getCapabilities({
+      GPUFLOW_API_KEY: "x",
+      GPUFLOW_BASE_URL: "https://example.test/v1",
+      GPUFLOW_MODEL_L2: "small",
+    });
+    expect(caps.l2).toBe(true);
+    expect(caps.l3).toBe(false);
+  });
+});

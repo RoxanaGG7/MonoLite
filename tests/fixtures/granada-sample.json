@@ -1,0 +1,30 @@
+{
+  "jurisdiction": "Granada (PGOU 2001)",
+  "version": "0.1.0",
+  "vigencia": "PGOU 2001 con adaptaciones posteriores (verificar BOP)",
+  "rules": [
+    {
+      "id": "GR-URB-05",
+      "version": "0.1.0",
+      "jurisdiction": "Granada (PGOU 2001)",
+      "source": {
+        "document": "PGOU Granada 2001, Título Séptimo",
+        "article": "7.3.23.2 (patios de luces)"
+      },
+      "conditions": {
+        "mode": "any",
+        "items": [
+          { "parameter": "patio.anchoMinimo", "operator": "<", "value": 3 },
+          {
+            "parameter": "patio.anchoMinimo",
+            "operator": "<",
+            "value": { "param": "patio.diametroMinimoRequerido" }
+          },
+          { "parameter": "patio.superficieUtil", "operator": "<", "value": 9 }
+        ]
+      },
+      "severity": "bloqueo",
+      "message": "El patio de luces no cumple las dimensiones mínimas del art. 7.3.23.2: lado ≥ 3,00 m, círculo de diámetro máx(3 m, H/3), superficie ≥ 9 m². La anchura mínima debe mantenerse en toda la altura (art. 7.3.22.3)."
+    }
+  ]
+}
