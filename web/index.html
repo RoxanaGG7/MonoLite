@@ -1,0 +1,71 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<title>MonoLite — Linter urbanístico en vivo (Granada, RUAIS)</title>
+<style>
+  body { font-family: system-ui, sans-serif; margin: 0; background: #f8fafc; color: #1e293b; }
+  header { background: #0f172a; color: white; padding: 14px 24px; }
+  header h1 { margin: 0; font-size: 18px; font-weight: 600; }
+  header p { margin: 2px 0 0; font-size: 12px; color: #94a3b8; }
+  main { display: grid; grid-template-columns: 380px 1fr; gap: 24px; padding: 24px; max-width: 1100px; margin: 0 auto; }
+  .panel { background: white; border: 1px solid #e2e8f0; border-radius: 10px; padding: 18px; }
+  .panel h2 { font-size: 13px; text-transform: uppercase; letter-spacing: 0.06em; color: #64748b; margin: 0 0 14px; }
+  label { display: block; font-size: 12px; color: #475569; margin: 12px 0 4px; font-weight: 600; }
+  input[type="range"], input[type="number"], select { width: 100%; }
+  #valorMargen { font-weight: 700; color: #0f172a; }
+  #estado { font-size: 20px; font-weight: 800; text-align: center; padding: 10px; border-radius: 8px; margin-bottom: 12px; }
+  #estado.verde { background: #dcfce7; color: #166534; }
+  #estado.rojo { background: #fee2e2; color: #991b1b; }
+  #violaciones { list-style: none; padding: 0; margin: 0; }
+  #violaciones li { padding: 10px 12px; border-left: 4px solid #ef4444; background: #fef2f2; border-radius: 6px; margin-bottom: 8px; font-size: 13px; }
+  #violaciones li em { color: #64748b; font-size: 11px; }
+  #violaciones li.ok { border-left-color: #22c55e; background: #f0fdf4; }
+  table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  td { padding: 6px 4px; border-bottom: 1px solid #f1f5f9; }
+  td:last-child { text-align: right; font-weight: 600; }
+  #plano { width: 100%; height: auto; background: #fffbeb; border-radius: 8px; }
+  .leyenda { font-size: 11px; color: #64748b; margin-top: 10px; }
+  .chip { display: inline-block; margin-right: 10px; }
+  svg text { font-family: system-ui; font-size: 11px; fill: #475569; }
+</style>
+</head>
+<body>
+<header>
+  <h1>MonoLite</h1>
+  <p>Linter urbanístico en vivo · Pack: Granada PGOU 2001 · Calificación: RUAIS (Residencial Unifamiliar Aislada) · CRS: EPSG:25830</p>
+</header>
+<main>
+  <div class="panel">
+    <h2>Proyecto</h2>
+    <label>Retranqueo (margen de la huella): <span id="valorMargen"></span></label>
+    <input type="range" id="margen" min="0.5" max="7" step="0.1" value="2.5" />
+    <label>Número de plantas</label>
+    <select id="plantas">
+      <option value="1">1 planta</option>
+      <option value="2" selected>2 plantas</option>
+      <option value="3">3 plantas</option>
+    </select>
+    <label>Altura máxima del edificio (m)</label>
+    <input type="number" id="altura" value="8.2" step="0.1" />
+    <label>Superficie edificada total (m²)</label>
+    <input type="number" id="edificada" value="300" step="10" />
+    <h2 style="margin-top:24px">Parámetros derivados</h2>
+    <table id="datos"></table>
+  </div>
+  <div class="panel">
+    <h2>Plano</h2>
+    <svg id="plano" viewBox="0 0 520 390" xmlns="http://www.w3.org/2000/svg"></svg>
+    <div class="leyenda">
+      <span class="chip"><span style="color:#2563eb">━━</span> lindero frontal</span>
+      <span class="chip"><span style="color:#9ca3af">━━</span> linderos laterales</span>
+      <span class="chip"><span style="color:#7c3aed">━━</span> testero</span>
+    </div>
+    <h2 style="margin-top:24px">Linter normativo</h2>
+    <div id="estado"></div>
+    <ul id="violaciones"></ul>
+  </div>
+</main>
+<script type="module" src="app.js"></script>
+</body>
+</html>

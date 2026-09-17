@@ -2,7 +2,8 @@ import { describe, expect, it } from "vitest";
 import { evaluatePack, evaluateRule } from "../src/engine/evaluator.js";
 import type { Rule } from "../src/engine/rule.js";
 import { loadPack } from "../src/engine/loader.js";
-import { deriveEdificio, derivePatio, type Lindero, type Punto } from "../src/core/kernel.js";
+import { deriveEdificio, derivePatio, type KernelModel, type Lindero, type Punto } from "../src/core/kernel.js";
+import { buildModel } from "../src/core/derive.js";
 import {
   areaPoligono,
   distanciaMinimaLinderos,
@@ -346,13 +347,96 @@ describe("reglas generales v0.2 (GR-URB-06 a 10)", () => {
   });
 });
 
+describe("constructor de modelos (geometría → parámetros derivados)", () => {
+  const kernel: KernelModel = {
+    parcela: {
+      id: "p1",
+      type: "parcela",
+      crs: "EPSG:25830",
+      superficie: 0,
+      contorno: [
+        { x: 0, y: 0 },
+        { x: 20, y: 0 },
+        { x: 20, y: 15 },
+        { x: 0, y: 15 },
+      ],
+      linderos: [
+        { tipo: "frontal", a: { x: 0, y: 0 }, b: { x: 20, y: 0 } },
+        { tipo: "lateral", a: { x: 0, y: 0 }, b: { x: 0, y: 15 } },
+        { tipo: "testero", a: { x: 20, y: 15 }, b: { x: 0, y: 15 } },
+      ],
+      cotaReferencia: 0,
+      calificacion: "RUAIS",
+    },
+    edificio: {
+      alturaMaxima: 7.9,
+      numeroPlantas: 2,
+      superficieEdificadaTotal: 300,
+      superficieOcupadaProyectada: 0,
+      huella: [
+        { x: 2.5, y: 2.5 },
+        { x: 17.5, y: 2.5 },
+        { x: 17.5, y: 12.5 },
+        { x: 2.5, y: 12.5 },
+      ],
+    },
+    entities: [],
+  };
+
+  it("calcula superficie de parcela y ocupación desde la geometría real", () => {
+    const model = buildModel(kernel);
+    expect((model.parcela as { superficie: number }).superficie).toBe(300);
+    const edificio = model.edificio as Record<string, number>;
+    expect(edificio.superficieOcupadaProyectada).toBe(150);
+    expect(edificio.distanciaMinimaLinderos).toBe(2.5);
+  });
+
+  it("el modelo derivado dispara las reglas RUAIS reales de retranqueo y edificabilidad", () => {
+    const model = buildModel(kernel);
+    const retranqueo: Rule = {
+      id: "GR-RUAIS-02",
+      version: "0.1.0",
+      jurisdiction: "Granada",
+      source: { document: "PGOU 2001", article: "7.11.3" },
+      conditions: {
+        mode: "any",
+        items: [{ parameter: "edificio.distanciaMinimaLinderos", operator: "<", value: 3 }],
+      },
+      severity: "bloqueo",
+      message: "Retranqueo mínimo RUAIS: 3,00 m.",
+    };
+    const edificabilidad: Rule = {
+      id: "GR-RUAIS-04B",
+      version: "0.1.0",
+      jurisdiction: "Granada",
+      source: { document: "PGOU 2001", article: "7.11.8.1.b" },
+      conditions: {
+        mode: "all",
+        items: [
+          { parameter: "edificio.numeroPlantas", operator: "==", value: 2 },
+          {
+            numerator: "edificio.superficieEdificadaTotal",
+            denominator: "parcela.superficie",
+            operator: ">",
+            value: 0.6,
+          },
+        ],
+      },
+      severity: "bloqueo",
+      message: "Edificabilidad máxima RUAIS 2 plantas: 0,60.",
+    };
+    expect(evaluateRule(retranqueo, model)).not.toBeNull();
+    expect(evaluateRule(edificabilidad, model)).not.toBeNull();
+  });
+});
+
 describe("pack legible por máquina (fixture Granada, GR-URB-05 real)", () => {
   const pack = loadPack(resolve("tests", "fixtures", "granada-sample.json"));
 
-  it("carga el pack con jurisdicción y regla citable", () => {
+  it("carga el pack con jurisdicción y reglas citables", () => {
     expect(pack.jurisdiction).toContain("Granada");
-    expect(pack.rules).toHaveLength(1);
-    expect(pack.rules[0].source.article).toContain("7.3.23.2");
+    expect(pack.rules.length).toBeGreaterThan(5);
+    expect(pack.rules.some((r) => r.source.article.includes("7.3.23.2"))).toBe(true);
   });
 
   it("la regla real del PGOU bloquea un patio de 2,5 m (art. 7.3.23.2)", () => {

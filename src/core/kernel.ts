@@ -27,6 +27,7 @@ export interface Parcela extends BaseEntity {
   type: "parcela";
   superficie: number;
   crs?: string;
+  contorno?: Punto[];
   linderos: Lindero[];
   cotaReferencia: number;
   calificacion?: string;

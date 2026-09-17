@@ -1,8 +1,112 @@
 {
   "jurisdiction": "Granada (PGOU 2001)",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "vigencia": "PGOU 2001 con adaptaciones posteriores (verificar BOP)",
   "rules": [
+    {
+      "id": "GR-RUAIS-01A",
+      "version": "0.1.0",
+      "jurisdiction": "Granada (PGOU 2001)",
+      "source": { "document": "PGOU Granada 2001, Título Séptimo (Continuación)", "article": "7.11.6.2.a" },
+      "scope": { "calificacion": "RUAIS" },
+      "conditions": {
+        "mode": "all",
+        "items": [
+          { "parameter": "edificio.numeroPlantas", "operator": "==", "value": 1 },
+          { "parameter": "edificio.alturaMaxima", "operator": ">", "value": 4.6 }
+        ]
+      },
+      "severity": "bloqueo",
+      "message": "Edificio de 1 planta en calificación RUAIS: la altura máxima es de 4,60 m (art. 7.11.6.2.a)."
+    },
+    {
+      "id": "GR-RUAIS-01B",
+      "version": "0.1.0",
+      "jurisdiction": "Granada (PGOU 2001)",
+      "source": { "document": "PGOU Granada 2001, Título Séptimo (Continuación)", "article": "7.11.6.2.b" },
+      "scope": { "calificacion": "RUAIS" },
+      "conditions": {
+        "mode": "all",
+        "items": [
+          { "parameter": "edificio.numeroPlantas", "operator": "==", "value": 2 },
+          { "parameter": "edificio.alturaMaxima", "operator": ">", "value": 7.9 }
+        ]
+      },
+      "severity": "bloqueo",
+      "message": "Edificio de 2 plantas en calificación RUAIS: la altura máxima es de 7,90 m (art. 7.11.6.2.b)."
+    },
+    {
+      "id": "GR-RUAIS-01C",
+      "version": "0.1.0",
+      "jurisdiction": "Granada (PGOU 2001)",
+      "source": { "document": "PGOU Granada 2001, Título Séptimo (Continuación)", "article": "7.11.6.2.c" },
+      "scope": { "calificacion": "RUAIS" },
+      "conditions": {
+        "mode": "all",
+        "items": [
+          { "parameter": "edificio.numeroPlantas", "operator": "==", "value": 3 },
+          { "parameter": "edificio.alturaMaxima", "operator": ">", "value": 11.2 }
+        ]
+      },
+      "severity": "bloqueo",
+      "message": "Edificio de 3 plantas en calificación RUAIS: la altura máxima es de 11,20 m (art. 7.11.6.2.c)."
+    },
+    {
+      "id": "GR-RUAIS-02",
+      "version": "0.1.0",
+      "jurisdiction": "Granada (PGOU 2001)",
+      "source": { "document": "PGOU Granada 2001, Título Séptimo (Continuación)", "article": "7.11.3" },
+      "scope": { "calificacion": "RUAIS" },
+      "conditions": {
+        "mode": "any",
+        "items": [
+          { "parameter": "edificio.distanciaMinimaLinderos", "operator": "<", "value": 3 }
+        ]
+      },
+      "severity": "bloqueo",
+      "message": "En calificación RUAIS la edificación debe separarse un mínimo de 3,00 m de todos los linderos (art. 7.11.3), medida en recta perpendicular al lindero (art. 7.3.6.1)."
+    },
+    {
+      "id": "GR-RUAIS-03",
+      "version": "0.1.0",
+      "jurisdiction": "Granada (PGOU 2001)",
+      "source": { "document": "PGOU Granada 2001, Título Séptimo (Continuación)", "article": "7.11.4.1" },
+      "scope": { "calificacion": "RUAIS" },
+      "conditions": {
+        "mode": "all",
+        "items": [
+          {
+            "numerator": "edificio.superficieOcupadaProyectada",
+            "denominator": "parcela.superficie",
+            "operator": ">",
+            "value": 0.3
+          }
+        ]
+      },
+      "severity": "bloqueo",
+      "message": "La ocupación máxima en calificación RUAIS es del 30% de la superficie de parcela por planta (art. 7.11.4.1)."
+    },
+    {
+      "id": "GR-RUAIS-04B",
+      "version": "0.1.0",
+      "jurisdiction": "Granada (PGOU 2001)",
+      "source": { "document": "PGOU Granada 2001, Título Séptimo (Continuación)", "article": "7.11.8.1.b" },
+      "scope": { "calificacion": "RUAIS" },
+      "conditions": {
+        "mode": "all",
+        "items": [
+          { "parameter": "edificio.numeroPlantas", "operator": "==", "value": 2 },
+          {
+            "numerator": "edificio.superficieEdificadaTotal",
+            "denominator": "parcela.superficie",
+            "operator": ">",
+            "value": 0.6
+          }
+        ]
+      },
+      "severity": "bloqueo",
+      "message": "Edificio de 2 plantas en calificación RUAIS: edificabilidad máxima 0,60 m²t/m²s (art. 7.11.8.1.b)."
+    },
     {
       "id": "GR-URB-05",
       "version": "0.1.0",
