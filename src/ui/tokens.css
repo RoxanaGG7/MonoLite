@@ -1,0 +1,51 @@
+@import url("https://fonts.googleapis.com/css2?family=Zen+Kaku+Gothic+New:wght@400;500;700&family=Shippori+Mincho:wght@500;600&family=DM+Mono:wght@400;500&display=swap");
+
+:root {
+  /* Superficies */
+  --ml-washi: #F6F4EF;
+  --ml-lamina: #FBFAF7;
+  --ml-kinari: #EFECE5;
+  --ml-hilo: #E2DED5;
+  --ml-cota: #C9C4B8;
+  --ml-vacio: #D9D5CB;
+
+  /* Tinta (sumi) */
+  --ml-sumi: #23221F;
+  --ml-sumi-2: #57554F;
+  --ml-sumi-3: #6E6B64;
+  --ml-sumi-4: #8A877F;
+
+  /* Institucional (añil) */
+  --ml-ail: #2F4A6D;
+  --ml-ail-hover: #1E3350;
+
+  /* Estados */
+  --ml-rojo: #A23A2C;  --ml-rojo-tinte: #F4E6E1;  --ml-rojo-tinta: #7E2A1F;
+  --ml-ambar: #94600F; --ml-ambar-tinte: #F5ECDC; --ml-ambar-tinta: #6B450A;
+  --ml-verde: #3E6A40; --ml-verde-tinte: #E6EEE2; --ml-verde-tinta: #2D4F2F;
+  --ml-neutro: #57554F; --ml-neutro-tinte: #EFECE5;
+
+  /* Tipografía */
+  --ml-font-ui: "Zen Kaku Gothic New", "Hiragino Sans", system-ui, sans-serif;
+  --ml-font-veredicto: "Shippori Mincho", "Hiragino Mincho ProN", Georgia, serif;
+  --ml-font-medida: "DM Mono", ui-monospace, monospace;
+
+  /* Escala de tipo (px) */
+  --ml-t-veredicto: 24px;
+  --ml-t-accion: 17px;
+  --ml-t-cifra: 17px;
+  --ml-t-cuerpo: 15px;
+  --ml-t-ui: 14px;
+  --ml-t-label: 13px;
+  --ml-t-meta: 12px;
+  --ml-t-overline: 11px;
+
+  /* Espacio */
+  --ml-gutter-plano: 56px;
+  --ml-gutter-panel: 36px;
+  --ml-gap-panel: 24px;
+
+  /* Forma */
+  --ml-radio-pill: 20px;
+  --ml-control-min: 44px;
+}

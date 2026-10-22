@@ -1,76 +1,125 @@
 <!DOCTYPE html>
 <html lang="es">
 <head>
-<meta charset="UTF-8">
-<title>MonoLite — Linter urbanístico en vivo (Granada, RUAIS)</title>
-<style>
-  body { font-family: system-ui, sans-serif; margin: 0; background: #f8fafc; color: #1e293b; }
-  header { background: #0f172a; color: white; padding: 14px 24px; }
-  header h1 { margin: 0; font-size: 18px; font-weight: 600; }
-  header p { margin: 2px 0 0; font-size: 12px; color: #94a3b8; }
-  main { display: grid; grid-template-columns: 380px 1fr; gap: 24px; padding: 24px; max-width: 1100px; margin: 0 auto; }
-  .panel { background: white; border: 1px solid #e2e8f0; border-radius: 10px; padding: 18px; }
-  .panel h2 { font-size: 13px; text-transform: uppercase; letter-spacing: 0.06em; color: #64748b; margin: 0 0 14px; }
-  label { display: block; font-size: 12px; color: #475569; margin: 12px 0 4px; font-weight: 600; }
-  input[type="range"], input[type="number"], select { width: 100%; }
-  #valorMargen { font-weight: 700; color: #0f172a; }
-  #estado { font-size: 20px; font-weight: 800; text-align: center; padding: 10px; border-radius: 8px; margin-bottom: 12px; }
-  #estado.verde { background: #dcfce7; color: #166534; }
-  #estado.rojo { background: #fee2e2; color: #991b1b; }
-  #violaciones { list-style: none; padding: 0; margin: 0; }
-  #violaciones li { padding: 10px 12px; border-left: 4px solid #ef4444; background: #fef2f2; border-radius: 6px; margin-bottom: 8px; font-size: 13px; }
-  #violaciones li em { color: #64748b; font-size: 11px; }
-  #violaciones li.ok { border-left-color: #22c55e; background: #f0fdf4; }
-  table { width: 100%; border-collapse: collapse; font-size: 13px; }
-  td { padding: 6px 4px; border-bottom: 1px solid #f1f5f9; }
-  td:last-child { text-align: right; font-weight: 600; }
-  #plano { width: 100%; height: auto; background: #fffbeb; border-radius: 8px; }
-  .leyenda { font-size: 11px; color: #64748b; margin-top: 10px; }
-  .chip { display: inline-block; margin-right: 10px; }
-  svg text { font-family: system-ui; font-size: 11px; fill: #475569; }
-</style>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>MonoLite</title>
+  <link rel="stylesheet" href="app.css?v=5">
 </head>
 <body>
-<header>
-  <h1>MonoLite</h1>
-  <p>Linter urbanístico en vivo · Pack: Granada PGOU 2001 · Calificación: RUAIS (Residencial Unifamiliar Aislada) · CRS: EPSG:25830</p>
-</header>
-<main>
-  <div class="panel">
-    <h2>Proyecto</h2>
-    <label>Calificación urbanística</label>
-    <select id="calificacion"></select>
-    <label>Retranqueo (margen de la huella): <span id="valorMargen"></span></label>
-    <input type="range" id="margen" min="0.5" max="7" step="0.1" value="2.5" />
-    <label>Número de plantas</label>
-    <select id="plantas">
-      <option value="1">1 planta</option>
-      <option value="2" selected>2 plantas</option>
-      <option value="3">3 plantas</option>
-    </select>
-    <label>Altura máxima del edificio (m)</label>
-    <input type="number" id="altura" value="8.2" step="0.1" />
-    <label>Superficie edificada total (m²)</label>
-    <input type="number" id="edificada" value="300" step="10" />
-    <p class="pista" style="font-size:11px;color:#64748b;margin-top:10px;">💡 Arrastra la huella verde/roja con el ratón para mover el edificio dentro de la parcela.</p>
-    <h2 style="margin-top:24px">Parámetros derivados</h2>
-    <table id="datos"></table>
-  </div>
-  <div class="panel">
-    <h2>Plano</h2>
-    <svg id="plano" viewBox="0 0 520 390" xmlns="http://www.w3.org/2000/svg" style="touch-action:none;"></svg>
-    <div class="leyenda">
-      <span class="chip"><span style="color:#2563eb">━━</span> lindero frontal</span>
-      <span class="chip"><span style="color:#9ca3af">━━</span> linderos laterales</span>
-      <span class="chip"><span style="color:#7c3aed">━━</span> testero</span>
+<div class="ml-root">
+  <header class="ml-header">
+    <div class="ml-marca">
+      <span class="ml-monolito"></span><b>MonoLite</b>
+      <span class="ml-ctx">Granada · PGOU 2001 · RUAIS</span>
     </div>
-    <h2 style="margin-top:24px">Linter normativo</h2>
-    <div id="estado"></div>
-    <ul id="violaciones"></ul>
-    <h2 style="margin-top:24px">Cobertura declarada</h2>
-    <div id="cobertura" style="font-size:12px;color:#475569;line-height:1.5;"></div>
+    <div class="ml-header-acciones">
+      <select id="idioma" aria-label="Idioma / Language">
+        <option value="es">Español</option>
+        <option value="en">English</option>
+      </select>
+      <input type="file" id="ifc-input" accept=".ifc" hidden>
+      <button type="button" class="ml-btn-texto" id="cargar-ifc" data-i18n="cargar-ifc">Cargar IFC</button>
+      <button type="button" class="ml-pill" id="btn-informe" data-i18n="informe">Informe</button>
+    </div>
+  </header>
+  <div class="ml-body">
+    <main class="ml-plan">
+      <div class="ml-barra">
+        <div>
+          <span class="ml-parcela-nombre" id="parcela-nombre"></span>
+          <span class="ml-parcela-datos" id="parcela-datos"></span>
+          <span class="ml-ifc-msg" id="ifc-msg"></span>
+          <p class="ml-msg" id="msg"></p>
+        </div>
+        <div>
+          <div class="ml-buscador-linea">
+            <input type="text" id="q" placeholder="Dirección de tu proyecto" aria-label="Dirección de tu proyecto">
+            <button type="button" class="ml-pill" id="buscar" data-i18n="buscar">Buscar</button>
+          </div>
+        </div>
+      </div>
+      <div class="ml-svgwrap">
+        <div class="ml-toolbar">
+          <button type="button" class="ml-vol-icono" id="vol-crear" data-i18n-title="tt-crear">▭</button>
+          <button type="button" class="ml-vol-icono" id="vol-vertices" data-i18n-title="tt-vertices">⬡</button>
+          <button type="button" class="ml-vol-icono" id="vol-girar" data-i18n-title="tt-girar" disabled>⟳</button>
+          <button type="button" class="ml-vol-icono" id="vol-espejo-h" data-i18n-title="tt-espejo-h" disabled>↔</button>
+          <button type="button" class="ml-vol-icono" id="vol-espejo-v" data-i18n-title="tt-espejo-v" disabled>↕</button>
+          <button type="button" class="ml-vol-icono" id="vol-alinear" data-i18n-title="tt-alinear" disabled>∥</button>
+          <button type="button" class="ml-vol-icono" id="vol-quitar" data-i18n-title="tt-quitar" disabled>✕</button>
+          <button type="button" class="ml-vol-icono" id="capa-crear" data-i18n-title="tt-capa" hidden>◧</button>
+          <button type="button" class="ml-vol-icono" id="capa-descargar" data-i18n-title="tt-descargar" hidden>⬇</button>
+        </div>
+        <div class="ml-tool-label" id="tool-label" hidden></div>
+        <div class="ml-dim-popup" id="dim-popup" hidden>
+          <span class="ml-unidad" data-i18n="largo">largo</span>
+          <input id="vol-largo" inputmode="decimal" value="12" aria-label="Largo en metros">
+          <span class="ml-unidad">×</span>
+          <span class="ml-unidad" data-i18n="ancho">ancho</span>
+          <input id="vol-ancho" inputmode="decimal" value="8" aria-label="Ancho en metros">
+          <span class="ml-unidad">m</span>
+          <button type="button" class="ml-vol-btn" id="dim-aplicar" data-i18n="aplicar">Aplicar</button>
+        </div>
+        <svg id="plano" xmlns="http://www.w3.org/2000/svg"></svg>
+        <div class="ml-modal" id="modal-lindero" hidden>
+          <div class="ml-modal-caja">
+            <div class="ml-modal-overline" data-i18n="modal-lind-over">CONFIRMA EL SITIO</div>
+            <p class="ml-modal-texto" data-i18n="modal-lind-preg">¿Es este lindero el frente a la vía pública?</p>
+            <div class="ml-modal-botones">
+              <button type="button" class="ml-pill" id="lindero-si" data-i18n="modal-lind-si">Sí, es el frente</button>
+              <button type="button" class="ml-btn-texto" id="lindero-no" data-i18n="cancelar">Cancelar</button>
+            </div>
+          </div>
+        </div>
+        <div class="ml-modal" id="modal-cal" hidden>
+          <div class="ml-modal-caja">
+            <div class="ml-modal-overline" data-i18n="modal-cal-over">CAPA DE CALIFICACIONES</div>
+            <p class="ml-modal-texto" data-i18n="modal-cal-preg">¿Qué calificación tiene el polígono trazado?</p>
+            <div class="ml-modal-botones">
+              <select id="cal-nueva" aria-label="Calificación del polígono">
+                <option value="RUAIS" selected data-i18n="cal-ruais-op">RUAIS (unifamiliar aislada)</option>
+                <option value="RUAS" data-i18n="cal-ruas-op">RUAS (residencial en suelo urbano)</option>
+                <option value="CASCO" data-i18n="cal-casco-op">Casco urbano</option>
+                <option value="OTRA" data-i18n="cal-otra-op">Otra / sin determinar</option>
+              </select>
+              <button type="button" class="ml-pill" id="cal-anadir" data-i18n="modal-cal-anadir">Añadir a la capa</button>
+              <button type="button" class="ml-btn-texto" id="cal-cancelar" data-i18n="modal-cal-descartar">Descartar</button>
+            </div>
+            <span class="ml-inst-pista" data-i18n="modal-cal-pista">traza el contorno de la zona de unifamiliares: sus bordes son calles o el cambio de tejido visible en la foto</span>
+          </div>
+        </div>
+      </div>
+      <div class="ml-franja">
+        <div class="ml-inst">
+          <label class="ml-inst-label" for="altura"><span data-i18n="altura-max">Altura máxima</span> <span class="ml-valor" id="valor-max"></span></label>
+          <div class="ml-altura-wrap">
+            <input type="text" id="altura" inputmode="decimal" aria-label="Altura del proyecto en metros">
+            <span class="ml-unidad">m</span>
+          </div>
+          <span class="ml-inst-pista" id="max-legal"></span>
+        </div>
+        <div class="ml-inst">
+          <label class="ml-inst-label" for="plantas"><span data-i18n="plantas">Plantas</span> <span class="ml-valor" id="valor-plantas"></span></label>
+          <select id="plantas" aria-label="Número de plantas">
+            <option value="" hidden selected></option>
+            <option value="1">1</option>
+            <option value="2">2</option>
+            <option value="3">3</option>
+          </select>
+          <span class="ml-inst-pista" id="plantas-legal"></span>
+        </div>
+        <div class="ml-leyenda">
+          <span class="ml-leyenda-item"><span class="ml-leyenda-sw"></span> <span data-i18n="ley-zona">zona construible · retranqueo mín. 3 m</span></span>
+          <span class="ml-leyenda-item"><span class="ml-leyenda-linea"></span> <span data-i18n="ley-frente">frente a vía pública</span></span>
+        </div>
+      </div>
+    </main>
+    <aside class="ml-side">
+      <div class="ml-side-inner" id="panel"></div>
+    </aside>
   </div>
-</main>
-<script src="app.js"></script>
+</div>
+<script src="app.js?v=5"></script>
 </body>
 </html>

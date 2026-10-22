@@ -71,3 +71,19 @@ para toda la fase de desarrollo/piloto de MonoLite.
 - Si una operación puede hacerse en L0 (determinista) o con cacheo, es
   obligatorio hacerlo así; el gasto de IA solo se justifica donde hay valor
   acumulable (packs) o interacción (copiloto).
+
+## Regla 8: Diagnóstico honesto — verificar antes de afirmar
+
+Lección del bug de la "píldora negra" (un `::after` huérfano de
+`attr(data-nombre)` en estilos.css, anterior a varios refactors, que sobrevivió
+invisible mientras se culpaba a la caché):
+
+- **Antes de afirmar una causa** (caché, navegador, datos), se VERIFICA en los
+  archivos reales: grep del síntoma en todo el código fuente y el build
+  (`estilos.css`, `app.css` compilado, HTML).
+- Nunca se repite una afirmación ya desmentida por la usuaria sin nueva
+  evidencia. "Sigue saliendo" significa que la hipótesis anterior era falsa.
+- Al eliminar un atributo HTML usado por CSS (como `data-nombre`), se busca
+  con grep dónde se consumía antes de darlo por muerto.
+- Los selectores CSS huérfanos (`::after`, `::before`) se auditan cuando se
+  toca el componente que los contiene, no solo las líneas que se editan.

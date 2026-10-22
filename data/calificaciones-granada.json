@@ -1,0 +1,25 @@
+{
+  "fuente": "PGOU Granada 2001 · Planos de usos y aprovechamientos (georreferenciación propia)",
+  "crs": "EPSG:25830",
+  "aviso": "Capa de calificaciones construida por el equipo MonoLite a partir de los planos oficiales del PGOU. Las zonas marcadas 'demo' fueron verificadas contra el plano de usos por el equipo; pendiente de cobertura real del municipio.",
+  "type": "FeatureCollection",
+  "features": [
+    {
+      "type": "Feature",
+      "properties": {
+        "calificacion": "RUAIS",
+        "nota": "zona demo · manzana de la parcela de referencia, verificada contra el plano de usos del PGOU por el equipo"
+      },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [[
+          [446290.0, 4113390.0],
+          [446396.0, 4113390.0],
+          [446396.0, 4113496.0],
+          [446290.0, 4113496.0],
+          [446290.0, 4113390.0]
+        ]]
+      }
+    }
+  ]
+}

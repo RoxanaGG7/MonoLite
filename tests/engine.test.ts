@@ -6,12 +6,22 @@ import { generarInforme } from "../src/engine/informe.js";
 import { loadPack } from "../src/engine/loader.js";
 import { deriveEdificio, derivePatio, type KernelModel, type Lindero, type Punto } from "../src/core/kernel.js";
 import { buildModel } from "../src/core/derive.js";
+import type { ExtractoIFC } from "../src/core/ifc.js";
 import {
   areaPoligono,
+  deGeograficaAUTM,
   distanciaEntrePoligonos,
   distanciaMinimaLinderos,
   distanciaPuntoSegmento,
+  poligonoInset,
+  poligonoOffsetInterior,
+  puntoEnPoligono,
 } from "../src/core/geometry.js";
+import {
+  parsearParcelasGML,
+  seleccionarParcelaRepresentativa,
+  type ParcelaCatastro,
+} from "../src/core/catastro.js";
 import { getCapabilities } from "../src/ai/capabilities.js";
 import { resolve } from "node:path";
 import { existsSync } from "node:fs";
@@ -263,6 +273,65 @@ describe("geometría del núcleo (distancias a linderos)", () => {
 
   it("área del polígono (fórmula del shoelace)", () => {
     expect(areaPoligono(huella(2.5))).toBe(15 * 10);
+  });
+
+  it("poligonoInset: el rectángulo 20×15 contraído 2,5 m da 15×10", () => {
+    const inset = poligonoInset(
+      [
+        { x: 0, y: 0 },
+        { x: 20, y: 0 },
+        { x: 20, y: 15 },
+        { x: 0, y: 15 },
+      ],
+      2.5
+    );
+    expect(inset.length).toBeGreaterThanOrEqual(3);
+    expect(areaPoligono(inset)).toBeCloseTo(150, 5);
+  });
+
+  it("poligonoInset: retranqueo que devora la parcela devuelve vacío", () => {
+    expect(
+      poligonoInset(
+        [
+          { x: 0, y: 0 },
+          { x: 20, y: 0 },
+          { x: 20, y: 15 },
+          { x: 0, y: 15 },
+        ],
+        8
+      )
+    ).toHaveLength(0);
+  });
+
+  it("poligonoOffsetInterior: parcela en L conserva el ala que el clipping de rectas mataba", () => {
+    const lote = [
+      { x: 0, y: 0 },
+      { x: 20, y: 0 },
+      { x: 20, y: 5 },
+      { x: 10, y: 5 },
+      { x: 10, y: 15 },
+      { x: 0, y: 15 },
+    ];
+    const clipping = poligonoInset(lote, 2);
+    const miter = poligonoOffsetInterior(lote, 2);
+    const areaMiter = areaPoligono(miter);
+    const areaClipping = clipping.length >= 3 ? areaPoligono(clipping) : 0;
+    expect(areaMiter).toBeGreaterThan(areaClipping);
+    expect(areaMiter).toBeGreaterThan(30);
+    for (const v of miter) {
+      expect(puntoEnPoligono(v, lote)).toBe(true);
+    }
+  });
+
+  it("poligonoOffsetInterior en la parcela REAL: área sana y todos los vértices dentro", async () => {
+    const real = (await import("../tests/fixtures/parcela-real.json", { with: { type: "json" } }))
+      .default as unknown as { parcela: { contorno: Punto[] } };
+    const miter = poligonoOffsetInterior(real.parcela.contorno, 1);
+    expect(miter.length).toBeGreaterThanOrEqual(3);
+    const area = areaPoligono(miter);
+    const areaLote = areaPoligono(real.parcela.contorno);
+    expect(area).toBeGreaterThan(0);
+    expect(area).toBeLessThan(areaLote);
   });
 
   it("sin huella suficiente no evalúa (regla no aplicable)", () => {
@@ -549,6 +618,102 @@ describe("informe con declaración de cobertura (anti-obsolescencia)", () => {
   );
 });
 
+describe("catastro y georreferenciación", () => {
+  it("UTM 30N: el meridiano central da x=500.000, y=0 exactos", () => {
+    const p = deGeograficaAUTM(0, -3);
+    expect(p.x).toBeCloseTo(500000, 0);
+    expect(p.y).toBeCloseTo(0, 0);
+  });
+
+  it("UTM 30N: Granada (Plaza Nueva) cae en la banda real de la ciudad", () => {
+    const p = deGeograficaAUTM(37.177, -3.593);
+    expect(p.x).toBeGreaterThan(444000);
+    expect(p.x).toBeLessThan(452000);
+    expect(p.y).toBeGreaterThan(4110000);
+    expect(p.y).toBeLessThan(4120000);
+  });
+
+  it("parse GML: extrae ref, área y polígono cerrado sin punto duplicado", () => {
+    const gml = `<?xml version="1.0"?>
+      <FeatureCollection xmlns:cp="http://inspire.ec.europa.eu/schemas/cp/4.0">
+        <member><cp:CadastralParcel>
+          <cp:areaValue uom="m2">300</cp:areaValue>
+          <cp:nationalCadastralReference>18018A01800039</cp:nationalCadastralReference>
+          <cp:geometry><gml:MultiSurface xmlns:gml="http://www.opengis.net/gml/3.2">
+            <gml:surfaceMember><gml:Surface><gml:patches><gml:PolygonPatch><gml:exterior>
+              <gml:LinearRing><gml:posList srsDimension="2">0 0 20 0 20 15 0 15 0 0</gml:posList></gml:LinearRing>
+            </gml:exterior></gml:PolygonPatch></gml:patches></gml:Surface></gml:surfaceMember>
+          </gml:MultiSurface></cp:geometry>
+        </cp:CadastralParcel></member>
+      </FeatureCollection>`;
+    const parcelas = parsearParcelasGML(gml);
+    expect(parcelas).toHaveLength(1);
+    expect(parcelas[0].ref).toBe("18018A01800039");
+    expect(parcelas[0].area).toBe(300);
+    expect(parcelas[0].puntos).toHaveLength(4);
+    expect(areaPoligono(parcelas[0].puntos)).toBe(300);
+  });
+
+  it("selección: prefiere refs estándar (AAAAA...) sobre códigos especiales V", () => {
+    const estandar: ParcelaCatastro = {
+      ref: "18018A01800039",
+      area: 400,
+      puntos: [
+        { x: 0, y: 0 },
+        { x: 20, y: 0 },
+        { x: 20, y: 20 },
+        { x: 0, y: 20 },
+      ],
+    };
+    const especial: ParcelaCatastro = {
+      ref: "6537003VG4163E",
+      area: 400,
+      puntos: [
+        { x: 0, y: 0 },
+        { x: 20, y: 0 },
+        { x: 20, y: 20 },
+        { x: 0, y: 20 },
+      ],
+    };
+    const elegida = seleccionarParcelaRepresentativa([especial, estandar]);
+    expect(elegida?.ref).toBe("18018A01800039");
+  });
+});
+
+describe("IFC → lote → linter (IfcOpenShell end-to-end)", () => {
+  it("el edificio IFC extrae 180 m² de huella, 2 plantas y 6,7 m de altura", async () => {
+    const extracto = (await import("../tests/fixtures/extracto-ifc.json", { with: { type: "json" } }))
+      .default as unknown as ExtractoIFC;
+    expect(extracto.edificio.superficieOcupadaProyectada).toBeCloseTo(180, 0);
+    expect(extracto.edificio.numeroPlantas).toBe(2);
+    expect(extracto.edificio.alturaMaxima).toBeCloseTo(6.7, 1);
+  });
+
+  it("el edificio IFC sobre el lote real de Arabial: solo viola el retranqueo RUAIS", async () => {
+    const parcela = (await import("../tests/fixtures/parcela-real.json", { with: { type: "json" } }))
+      .default as unknown as KernelModel;
+    const extracto = (await import("../tests/fixtures/extracto-ifc.json", { with: { type: "json" } }))
+      .default as unknown as ExtractoIFC;
+    const { extractoAKernel } = await import("../src/core/ifc.js");
+    const kernel = extractoAKernel(extracto, parcela);
+    const model = buildModel(kernel);
+
+    const edificabilidad = model.edificio as Record<string, number>;
+    expect(edificabilidad.superficieOcupadaProyectada).toBeCloseTo(180, 0);
+    expect(Number((model.parcela as Record<string, number>).superficie)).toBeGreaterThan(2000);
+
+    const reglasRUAIS = (await import("../tests/fixtures/granada-sample.json", { with: { type: "json" } }))
+      .default.rules as Rule[];
+    const activas = reglasRUAIS.filter((r) => !r.scope || r.scope.calificacion === "RUAIS");
+    const violaciones = evaluatePack(activas, model);
+    const ids = violaciones.map((v) => v.ruleId);
+    expect(ids).toContain("GR-RUAIS-02");
+    expect(ids).not.toContain("GR-RUAIS-01B");
+    expect(ids).not.toContain("GR-RUAIS-03");
+    expect(ids).not.toContain("GR-RUAIS-04B");
+  });
+});
+
 describe("constructor de modelos (geometría → parámetros derivados)", () => {
   const kernel: KernelModel = {
     parcela: {
@@ -643,8 +808,7 @@ describe("constructor de modelos (geometría → parámetros derivados)", () => 
     expect(distanciaEntrePoligonos(a, b)).toBe(12);
   });
 
-  it("perímetro de sótano RUAIS: no puede exceder la ocupación sobre rasante (art. 7.11.5.2)", () => {
-    const rule: Rule = {
+  it("perímetro de sótano RUAIS: no puede exceder la ocupación sobre rasante (art. 7.11.5.2)", () => {    const rule: Rule = {
       id: "GR-RUAIS-10",
       version: "0.1.0",
       jurisdiction: "Granada",

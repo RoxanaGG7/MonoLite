@@ -1,0 +1,69 @@
+{
+  "fuente": {
+    "ifc": "demo-edificio.ifc",
+    "extractor": "ifcopenshell 0.9"
+  },
+  "crs": "EPSG:25830",
+  "origenUTM": {
+    "x": 446308.852,
+    "y": 4113448.951
+  },
+  "georreferencia": null,
+  "edificio": {
+    "huella": [
+      {
+        "x": 446308.852,
+        "y": 4113460.651
+      },
+      {
+        "x": 446308.852,
+        "y": 4113460.951
+      },
+      {
+        "x": 446309.152,
+        "y": 4113460.951
+      },
+      {
+        "x": 446323.552,
+        "y": 4113460.951
+      },
+      {
+        "x": 446323.852,
+        "y": 4113460.951
+      },
+      {
+        "x": 446323.852,
+        "y": 4113460.651
+      },
+      {
+        "x": 446323.852,
+        "y": 4113449.2509999997
+      },
+      {
+        "x": 446323.852,
+        "y": 4113448.951
+      },
+      {
+        "x": 446323.552,
+        "y": 4113448.951
+      },
+      {
+        "x": 446309.152,
+        "y": 4113448.951
+      },
+      {
+        "x": 446308.852,
+        "y": 4113448.951
+      },
+      {
+        "x": 446308.852,
+        "y": 4113449.2509999997
+      }
+    ],
+    "numeroPlantas": 2,
+    "alturaMaxima": 6.7,
+    "superficieOcupadaProyectada": 180.0,
+    "superficieEdificadaTotal": 360.0
+  },
+  "nota": "superficieEdificadaTotal = huella x plantas (simplificacion v0; el computo legal 7.3.13 pendiente de conectar)"
+}
